@@ -12,7 +12,8 @@ export const SETTING_DEFS = [
   { key: 'showGrid', label: 'Show reference grid', type: 'bool', default: false },
   { key: 'quality', label: 'Graphics quality', type: 'select', options: [['high', 'High (sharp, uses more power)'], ['balanced', 'Balanced']], default: 'high' },
   { group: 'Docking agent' },
-  { key: 'startPretrained', label: 'Start with the pretrained agent', type: 'bool', default: true, hint: 'Off: the agent starts untrained so you can watch it learn from scratch.' },
+  { key: 'startPretrained', label: 'Start with the pretrained agent', type: 'bool', default: true, hint: 'Used when there is no saved agent of yours. Off: start untrained and watch it learn from scratch.' },
+  { key: 'rememberAgent', label: 'Remember my trained agent between launches', type: 'bool', default: true, hint: 'Saved automatically while it trains. Load pretrained or Start from scratch replaces it.' },
   { key: 'learningRate', label: 'Learning rate', type: 'select', options: [[0.0003, '0.0003 (slow, steady)'], [0.001, '0.001 (default)'], [0.003, '0.003 (fast, can be unstable)']], default: 0.001 },
   { key: 'playbackSpeed', label: 'Episode playback speed', type: 'select', options: [[1, 'Real time'], [5, '5×'], [20, '20×'], [60, '60×']], default: 20 },
 ];

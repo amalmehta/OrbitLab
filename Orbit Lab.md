@@ -75,7 +75,6 @@ Decided without asking:
 - Dark theme only. Bundle id com.amalmehta.orbitlab. Not notarized (ad-hoc signed for local use).
 
 Proposals (not done; say the word):
-- Save agents trained in the app between launches.
 - Lunar inclination/eccentricity and out-of-plane maneuvers.
 
 CHANGELOG:
@@ -99,3 +98,4 @@ CHANGELOG:
 - 2026-10-05 — added meta-instruction: applications include a settings button or tab
 - 2026-10-06 — built v1.0: Mac app with Hohmann, gravity-assist and rendezvous planners, plus a live-training PPO docking agent; docs, tests, GitHub repo
 - 2026-10-06 — website step: published to GitHub Pages via a build-and-deploy workflow
+- 2026-10-06 — trained docking agents are saved between launches (Mac app and website), with a setting to turn it off

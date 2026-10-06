@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { MLP, seededRandom } from '../web/src/rl/mlp.js';
 import { DockingEnv } from '../web/src/rl/dockingEnv.js';
-import { PPOAgent, Trainer, evaluate } from '../web/src/rl/ppo.js';
+import { PPOAgent, Trainer, evaluate, compact } from '../web/src/rl/ppo.js';
 
 test('MLP backprop matches finite differences', () => {
   const net = new MLP([3, 5, 2], seededRandom(3));
@@ -52,4 +52,18 @@ test('shipped pretrained agent docks reliably', { skip: !existsSync('web/assets/
   const agent = PPOAgent.fromJSON(JSON.parse(readFileSync('web/assets/pretrained-docking.json', 'utf8')));
   const ev = evaluate(agent, 100, 1234);
   assert.ok(ev.successRate >= 0.9, `success ${ev.successRate}`);
+});
+
+test('a saved agent (compacted, through JSON) flies the same as the original', { skip: !existsSync('web/assets/pretrained-docking.json') }, () => {
+  const original = PPOAgent.fromJSON(JSON.parse(readFileSync('web/assets/pretrained-docking.json', 'utf8')));
+  const saved = JSON.stringify(compact({ agent: original.toJSON() }));
+  const restored = PPOAgent.fromJSON(JSON.parse(saved).agent);
+  assert.ok(saved.length < JSON.stringify(original.toJSON()).length * 0.7, 'compacted save is smaller');
+  const env = new DockingEnv(seededRandom(8));
+  for (let i = 0; i < 50; i++) {
+    const obs = env.reset();
+    const a = original.act(obs, true).action, b = restored.act(obs, true).action;
+    for (let k = 0; k < 3; k++) assert.ok(Math.abs(a[k] - b[k]) < 1e-4);
+  }
+  assert.equal(evaluate(restored, 50, 4321).successRate, evaluate(original, 50, 4321).successRate);
 });

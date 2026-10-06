@@ -195,7 +195,7 @@ const docking = new DockingController({
   settings,
   onStats: (s, history, ctl) => {
     readout($('#d-stats'), [
-      ['Agent', ctl.source === 'pretrained' ? 'Pretrained' : 'Learning from scratch'],
+      ['Agent', ctl.describe()],
       ['Training steps', Math.round(s.totalSteps).toLocaleString()],
       ['Updates this session', s.iteration],
       ['Success, last 50 tries', `${Math.round(s.successRate * 100)}%`, 'strong'],

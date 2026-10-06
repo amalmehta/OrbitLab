@@ -50,6 +50,8 @@ A small neural network flies the last 15–50 m to the docking port.
 - **Load pretrained**: the shipped agent, trained for about 290k steps.
 - **Start from scratch**: wipes the agent and starts training.
 
+**Your agent is saved between launches.** While it trains, Orbit Lab saves its network, step count and learning curve every 10 seconds and when you pause. Next time you open the app it comes back, labelled "Yours, saved <date>", and **Train** continues from there. **Load pretrained** and **Start from scratch** replace the saved agent. To stop saving, turn off *Remember my trained agent between launches* in Settings.
+
 A replay ends with **Docked** (contact under 0.25 m/s), **Hit the station too hard**, **Drifted away** or **Ran out of time**.
 
 ### Controls
@@ -62,7 +64,7 @@ A replay ends with **Docked** (contact under 0.25 m/s), **Hit the station too ha
 | Feedback | the **Feedback** tab on the right edge (or Help ▸ Send Feedback…) |
 
 ### Settings
-Everything lives in one sheet: time warp for flights, slowing down for burns, labels, the Moon's sphere of influence, the reference grid, graphics quality, whether the docking agent starts pretrained, learning rate, and replay speed. In the Mac app, settings are saved in the app's preferences (UserDefaults). In a browser, they're saved in local storage.
+Everything lives in one sheet: time warp for flights, slowing down for burns, labels, the Moon's sphere of influence, the reference grid, graphics quality, whether the docking agent starts pretrained, whether to remember your trained agent, learning rate, and replay speed. In the Mac app, settings are saved in the app's preferences (UserDefaults). In a browser, they're saved in local storage.
 
 ### Feedback
 Feedback is saved locally. The Mac app writes it to `~/Library/Application Support/Orbit Lab/feedback.jsonl`; a browser keeps it in local storage. **Open as GitHub issue** opens a pre-filled issue in your browser. Nothing is sent automatically.

@@ -241,3 +241,12 @@ export function evaluate(agent, episodes = 100, seed = 99) {
   }
   return { successRate: counts.docked / episodes, counts, meanFuel: fuel / episodes, meanSteps: steps / episodes };
 }
+
+// Rounds every number to 7 significant digits so a saved agent is about half the size,
+// with no visible effect on the policy.
+export function compact(x) {
+  if (Array.isArray(x)) return x.map(compact);
+  if (typeof x === 'number') return Number(x.toPrecision(7));
+  if (x && typeof x === 'object') return Object.fromEntries(Object.entries(x).map(([k, v]) => [k, compact(v)]));
+  return x;
+}

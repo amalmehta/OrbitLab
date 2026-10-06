@@ -24,14 +24,14 @@ Orbit Lab/
 ├── tests/
 │   ├── physics.test.mjs          Hohmann numbers, energy conservation, burns, impacts
 │   ├── planners.test.mjs         Each planner, flown in the full model
-│   └── rl.test.mjs               Backprop gradient check, environment, PPO learns, pretrained agent
+│   └── rl.test.mjs               Backprop gradient check, environment, PPO learns, pretrained agent, save round-trip
 └── web/
     ├── index.html                Layout: top bar, side panels, viewport, feedback tab, settings sheet
     ├── styles.css                All styling
     ├── assets/pretrained-docking.json   Shipped docking policy (actor and critic weights)
     └── src/
         ├── main.js               Wires scenarios, scenes, clock, panels and keyboard together
-        ├── dockingController.js  Docking mode: training worker, replays, hand-over
+        ├── dockingController.js  Docking mode: training worker, replays, hand-over, saving your agent
         ├── physics/
         │   ├── constants.js      Earth and Moon constants (km, s)
         │   ├── orbits.js         Vector maths, Hohmann, orbital elements, Moon ephemeris

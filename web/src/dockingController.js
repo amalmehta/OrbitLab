@@ -1,10 +1,14 @@
 // Drives the Docking Agent mode: trains PPO in a Web Worker while the main thread replays
 // episodes with the latest policy, so you watch the agent improve in real time.
 
-import { PPOAgent, Trainer } from './rl/ppo.js';
+import { PPOAgent, Trainer, compact } from './rl/ppo.js';
 import { DockingEnv, DOCKING } from './rl/dockingEnv.js';
 import { seededRandom } from './rl/mlp.js';
+import { loadStored, saveStored } from './ui/bridge.js';
 import pretrained from '../assets/pretrained-docking.json';
+
+const SAVE_EVERY_MS = 10000;
+const SAVE_VERSION = 1;
 
 /* global __WORKER_SOURCE__ */
 
@@ -21,8 +25,75 @@ export class DockingController {
     this.pauseUntil = 0;
     this.acc = 0;
     this.stats = { iteration: 0, totalSteps: 0, episodes: 0, successRate: 0 };
+    this.lastSave = 0;
     this.worker = this.makeWorker();
-    this.reset(settings.get('startPretrained'));
+    if (!this.restore()) this.reset(settings.get('startPretrained'));
+    settings.onChange((k) => { if ((k === 'rememberAgent' || k === '*') && !settings.get('rememberAgent')) this.forget(); });
+  }
+
+  // ---- saving between launches ----
+
+  remember() {
+    return Boolean(this.settings.get('rememberAgent'));
+  }
+
+  save() {
+    // Only agents that are yours: trained this session, or restored from a previous one.
+    const yours = this.source !== 'pretrained' && (this.stats.iteration > 0 || this.restored);
+    if (!this.remember() || !yours) return;
+    this.lastSave = Date.now();
+    saveStored('agent', compact({
+      version: SAVE_VERSION,
+      savedAt: new Date().toISOString(),
+      agent: this.agent.toJSON(),
+      stats: { totalSteps: this.stats.totalSteps, successRate: this.stats.successRate },
+      history: this.history,
+    }));
+  }
+
+  forget() {
+    saveStored('agent', null);
+  }
+
+  // Load the agent saved last time. Returns false if there is none or it doesn't fit this version.
+  restore() {
+    if (!this.remember()) return false;
+    const saved = loadStored('agent');
+    if (!saved || saved.version !== SAVE_VERSION || !saved.agent?.actor) return false;
+    try {
+      this.stopTraining();
+      this.agent = PPOAgent.fromJSON({ ...saved.agent, hyper: { ...saved.agent.hyper, ...this.hyper() } });
+    } catch (err) {
+      console.warn('Saved docking agent could not be loaded; starting fresh', err);
+      return false;
+    }
+    this.source = 'saved';
+    this.restored = true;
+    this.savedAt = saved.savedAt;
+    const startSteps = saved.stats?.totalSteps ?? 0;
+    this.history = saved.history ?? [];
+    this.stats = { iteration: 0, totalSteps: startSteps, episodes: 0, successRate: saved.stats?.successRate ?? 0 };
+    const seed = Math.floor(Math.random() * 1e6);
+    if (this.worker) {
+      this.worker.postMessage({ type: 'init', weights: saved.agent, hyper: this.hyper(), seed, startSteps });
+    } else {
+      this.localTrainer = new Trainer(this.agent, seed + 1);
+      this.localTrainer.totalSteps = startSteps;
+    }
+    this.scene.clearGhosts();
+    this.newEpisode();
+    this.onStats?.(this.stats, this.history, this);
+    return true;
+  }
+
+  // Short description of where the current agent came from, for the panel.
+  describe() {
+    if (this.source === 'pretrained') return 'Pretrained';
+    if (this.source === 'saved') {
+      const when = this.savedAt ? new Date(this.savedAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '';
+      return this.stats.iteration ? 'Yours, training further' : `Yours, saved ${when}`;
+    }
+    return 'Learning from scratch';
   }
 
   makeWorker() {
@@ -41,8 +112,11 @@ export class DockingController {
     return { lr: Number(this.settings.get('learningRate')) };
   }
 
+  // Replaces the current agent (and the saved one) with the pretrained agent or an untrained one.
   reset(usePretrained) {
     this.stopTraining();
+    this.restored = false;
+    this.forget();
     const seed = Math.floor(Math.random() * 1e6);
     this.agent = usePretrained ? PPOAgent.fromJSON({ ...pretrained, hyper: { ...pretrained.hyper, ...this.hyper() } }) : new PPOAgent(this.hyper(), seed);
     this.source = usePretrained ? 'pretrained' : 'scratch';
@@ -76,6 +150,9 @@ export class DockingController {
     this.stats = s;
     if (s.episodes > 0) this.history.push({ steps: s.totalSteps, success: s.successRate });
     if (this.history.length > 400) this.history.splice(1, 1);
+    // Once a pretrained agent has been trained further it becomes "yours" and is worth saving.
+    if (this.source === 'pretrained') { this.source = 'saved'; this.restored = true; }
+    if (this.saveSoon || Date.now() - this.lastSave > SAVE_EVERY_MS) { this.saveSoon = false; this.save(); }
     this.onStats?.(this.stats, this.history, this);
   }
 
@@ -87,8 +164,10 @@ export class DockingController {
   }
 
   stopTraining() {
+    const wasTraining = this.training;
     this.training = false;
     if (this.worker) this.worker.postMessage({ type: 'stop' });
+    if (wasTraining) { this.save(); this.saveSoon = true; } // and again when the in-flight update lands
   }
 
   localLoop() {

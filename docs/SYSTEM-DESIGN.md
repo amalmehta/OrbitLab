@@ -63,6 +63,8 @@ flowchart TB
 
 **Website deploy.** A push to `main` runs `.github/workflows/pages.yml`: `npm ci`, `npm run build`, then `index.html`, `styles.css` and `dist/app.js` are uploaded as the Pages artifact and deployed to https://amalmehta.github.io/OrbitLab/. The page detects that it isn't inside the Mac app (`isMacApp()` is false) and uses localStorage for settings and feedback.
 
+**Saving the agent.** After each training update, `DockingController.recordStats` saves the agent if 10 s have passed since the last save. Pausing saves immediately, and again when the in-flight update arrives. The snapshot is `{ version, savedAt, agent, stats, history }`, with numbers rounded to 7 significant digits by `compact()`. On launch, `restore()` loads a matching snapshot ahead of the pretrained/scratch setting and initialises the worker from it, so training continues from the saved step count. A pretrained agent becomes "yours", and is saved, once it has trained further. **Load pretrained** and **Start from scratch** clear the save.
+
 **Settings and feedback.** `settings.set` → `saveStored` → in the Mac app a `store` message to UserDefaults (injected as `window.__ORBIT_LAB_STORE__` on the next launch), in a browser localStorage.
 
 ## Where data lives
@@ -72,7 +74,7 @@ flowchart TB
 | Settings and last slider values | Mac app: UserDefaults (`com.amalmehta.orbitlab`, key `OrbitLabStore`). Browser: localStorage `orbitLab.*` |
 | Feedback | `~/Library/Application Support/Orbit Lab/feedback.jsonl` (browser: localStorage) |
 | Pretrained policy | `web/assets/pretrained-docking.json`, bundled into `app.js` at build time |
-| Policies trained in the app | memory only; lost when the app quits |
+| Your trained agent (weights, step count, learning curve) | Same store as settings, key `agent`: UserDefaults in the Mac app, localStorage `orbitLab.agent` on the website. About 60 KB |
 
 ## Key decisions and trade-offs
 
@@ -83,6 +85,7 @@ flowchart TB
 - **Fixed-step RK4 with an adaptive step instead of an embedded adaptive method.** Simple and predictable, and lands exactly on burn times. Energy drift is under 10⁻⁷ per LEO orbit.
 - **Gravity assist chosen by side, not by "gain or lose".** Arriving near apogee, the Moon-relative velocity points almost backwards, so either side *gains* energy. Labelling the choice "lose energy" would be wrong. The panel reports the true sign instead.
 - **Clohessy–Wiltshire for docking, numerical orbits for rendezvous.** CW is exact enough within 100 m and cheap enough to train on. The hand-over converts the full-model state into the CW frame.
+- **Agent saved through the settings store, not a file.** It reuses the same bridge in both the Mac app and the browser, with no file-system code. Cost: at most the last 10 s of training is lost if the app quits mid-update, and Adam's optimiser state isn't saved (it restarts on resume, which barely matters at this scale).
 - **Website built in CI, not committed.** `web/dist/` stays out of git, and the Pages workflow builds it, so the site always matches `main`. Cost: a deploy needs a successful CI run (about a minute).
 - **Procedural textures instead of image files.** WebGL can't read `file://` images in WKWebView (cross-origin), so textures are painted in workers. Cost: about 3–5 s on an Intel i9 before textures appear (plain colours until then).
 
@@ -91,7 +94,7 @@ flowchart TB
 `npm test` runs Node's built-in test runner on the same modules the app uses:
 - **Physics**: textbook LEO→GEO Δv (3.89 km/s), Moon sphere of influence, energy conservation, a numerically flown Hohmann ending circular, frame orthogonality, impact detection.
 - **Planners**: each plan flown in the full Earth–Moon model. GEO reached within 50 km. Flyby altitude within 50 km. A trailing flyby gains energy and a fast leading flyby loses it. Rendezvous ends within 2 m of the aim point at under 0.1 m/s, even when flown in uneven frame-sized chunks the way the app does.
-- **RL**: backprop checked against finite differences. The environment can't dock by drifting, and a simple controller does dock. PPO goes from scratch to ≥ 50% success in 28 updates. The shipped checkpoint docks ≥ 90% of the time on unseen starts.
+- **RL**: backprop checked against finite differences. The environment can't dock by drifting, and a simple controller does dock. PPO goes from scratch to ≥ 50% success in 28 updates. The shipped checkpoint docks ≥ 90% of the time on unseen starts. A saved agent (compacted and sent through JSON) picks the same actions as the original and docks just as often.
 - **UI**: checked by hand in Chrome and in the built Mac app. `scripts/screenshots.mjs` drives every mode end to end in headless Chrome.
 
 ## Known limits
@@ -99,7 +102,7 @@ flowchart TB
 - The Moon's orbit is circular and in the same plane as all spacecraft orbits. No plane changes.
 - Burns are instantaneous. There's no finite-burn or fuel-mass model.
 - The docking agent controls translation only (no attitude), and the port is a point with a speed limit.
-- Training in the app isn't saved between launches.
+- Only one trained agent is kept. Saving a new one replaces it, and there's no import/export.
 - WebKit pauses rendering when the window is hidden, so flights pause too.
 - Startup textures take a few seconds on older Macs.
 - The website has no Mac menu, so Help and ⌘1–4 are Mac-only (the browser uses 1–4).
