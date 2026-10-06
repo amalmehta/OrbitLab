@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MU_EARTH, R_EARTH, MOON_SOI } from '../web/src/physics/constants.js';
-import { hohmann, elements, circularState, period, localFrame } from '../web/src/physics/orbits.js';
+import { MU_EARTH, R_EARTH, MOON_SOI, MOON_ORBIT, DEG } from '../web/src/physics/constants.js';
+import { hohmann, hohmannPlaneChange, elements, circularState, moonState, period, localFrame } from '../web/src/physics/orbits.js';
 import { Propagator, toState } from '../web/src/physics/propagator.js';
 
 test('Hohmann LEO→GEO matches textbook Δv (≈3.9 km/s)', () => {
@@ -50,4 +50,24 @@ test('propagator detects an Earth impact', () => {
   const res = new Propagator({ moon: false }).propagate(s, 0, 20000);
   assert.equal(res.impact, 'Earth');
   assert.ok(MU_EARTH > 0);
+});
+
+test('inclined circular states have the requested inclination', () => {
+  for (const inc of [0, 28.5, 51.6, 90]) {
+    const { r, v } = circularState(7000, 1.234, undefined, inc * DEG, 0.7);
+    assert.ok(Math.abs(elements(r, v).inc / DEG - inc) < 1e-9);
+  }
+});
+
+test("the Moon's orbit is tilted to the equator by the chosen inclination", () => {
+  const top = moonState(0, Math.PI / 2, 28 * DEG); // 90° past the ascending node
+  assert.ok(Math.abs(top.r[2] - MOON_ORBIT * Math.sin(28 * DEG)) < 1e-6);
+  assert.ok(Math.abs(Math.hypot(...top.v) - Math.hypot(...moonState(1000, 0, 28 * DEG).v)) < 1e-12, 'constant speed');
+});
+
+test('Hohmann with plane change: Florida LEO → GEO matches the textbook (~4.2 km/s, ~2° at perigee)', () => {
+  const h = hohmannPlaneChange(R_EARTH + 300, 42164, -28.5 * DEG);
+  assert.ok(h.total > 4.2 && h.total < 4.27, `total ${h.total}`);
+  assert.ok(Math.abs(h.di1 / DEG) > 1.5 && Math.abs(h.di1 / DEG) < 3, `first-burn tilt ${h.di1 / DEG}`);
+  assert.ok(h.separateTotal - h.total > 1, 'splitting saves over a separate plane change');
 });

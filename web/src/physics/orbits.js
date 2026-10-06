@@ -58,17 +58,76 @@ export function conicPoints(r, v, mu = MU_EARTH, n = 256, maxR = Infinity) {
   return pts;
 }
 
-// The Moon on a circular orbit in the reference (x–y) plane. phase0 = angle at t = 0.
-export function moonState(t, phase0 = 0) {
-  const th = phase0 + MOON_RATE * t;
-  const c = Math.cos(th), s = Math.sin(th), v = MOON_ORBIT * MOON_RATE;
-  return { r: [MOON_ORBIT * c, MOON_ORBIT * s, 0], v: [-v * s, v * c, 0], angle: th };
+// Unit vectors of a circular orbit's plane. P points to the ascending node, Q is 90° ahead in the
+// direction of motion, W is the orbit normal. inc and raan in radians; the reference plane is the
+// equator (x–y) and the node line sits at angle raan from +x.
+export function planeAxes(inc = 0, raan = 0) {
+  const cO = Math.cos(raan), sO = Math.sin(raan), ci = Math.cos(inc), si = Math.sin(inc);
+  return { P: [cO, sO, 0], Q: [-sO * ci, cO * ci, si], W: [sO * si, -cO * si, ci] };
 }
 
-// State on a circular orbit in the reference plane at angle theta (counter-clockwise).
-export function circularState(radius, theta, mu = MU_EARTH) {
+// State on a circular orbit at argument of latitude u (angle from the ascending node).
+export function circularState(radius, u, mu = MU_EARTH, inc = 0, raan = 0) {
   const v = circularSpeed(radius, mu);
-  return { r: [radius * Math.cos(theta), radius * Math.sin(theta), 0], v: [-v * Math.sin(theta), v * Math.cos(theta), 0] };
+  const { P, Q } = planeAxes(inc, raan);
+  const c = Math.cos(u), s = Math.sin(u);
+  return {
+    r: [radius * (P[0] * c + Q[0] * s), radius * (P[1] * c + Q[1] * s), radius * (P[2] * c + Q[2] * s)],
+    v: [v * (-P[0] * s + Q[0] * c), v * (-P[1] * s + Q[1] * c), v * (-P[2] * s + Q[2] * c)],
+  };
+}
+
+// The Moon on a circular orbit tilted by inc to the equator, ascending node on +x.
+// phase0 = argument of latitude at t = 0.
+export function moonState(t, phase0 = 0, inc = 0) {
+  const u = phase0 + MOON_RATE * t;
+  const s = circularState(MOON_ORBIT, u, MU_EARTH, inc, 0);
+  const k = (MOON_ORBIT * MOON_RATE) / norm(s.v); // circular speed uses μ_E; the Moon's rate uses μ_E + μ_M
+  return { r: s.r, v: scale(s.v, k), angle: u };
+}
+
+// Δv for a two-burn Hohmann transfer that also changes inclination by di (radians), with the
+// plane change split between the burns to minimise the total. Burns happen at the nodes.
+export function hohmannPlaneChange(r1, r2, di, mu = MU_EARTH) {
+  const h = hohmann(r1, r2, mu);
+  const v1 = circularSpeed(r1, mu), v2 = circularSpeed(r2, mu);
+  const vp = visViva(r1, h.a, mu), va = visViva(r2, h.a, mu);
+  const cost = (s) => {
+    const d1 = Math.sqrt(v1 * v1 + vp * vp - 2 * v1 * vp * Math.cos(s));
+    const d2 = Math.sqrt(va * va + v2 * v2 - 2 * va * v2 * Math.cos(di - s));
+    return { d1, d2, total: d1 + d2 };
+  };
+  // golden-section search for the share of the plane change done at the first burn
+  const g = (Math.sqrt(5) - 1) / 2;
+  let lo = Math.min(0, di), hi = Math.max(0, di);
+  let x1 = hi - g * (hi - lo), x2 = lo + g * (hi - lo);
+  for (let i = 0; i < 80; i++) {
+    if (cost(x1).total < cost(x2).total) { hi = x2; x2 = x1; x1 = hi - g * (hi - lo); }
+    else { lo = x1; x1 = x2; x2 = lo + g * (hi - lo); }
+  }
+  const s1 = (lo + hi) / 2;
+  const best = cost(s1);
+  return {
+    ...h, v1, v2, vp, va,
+    di1: s1, di2: di - s1,
+    dv1: best.d1, dv2: best.d2, total: best.total,
+    // for comparison: a plain Hohmann, then a separate plane change once circular at r2
+    separateTotal: h.total + 2 * v2 * Math.sin(Math.abs(di) / 2),
+  };
+}
+
+// Angle between two orbit planes.
+export function planeAngle(inc1, raan1, inc2, raan2) {
+  const a = planeAxes(inc1, raan1).W, b = planeAxes(inc2, raan2).W;
+  return Math.acos(Math.max(-1, Math.min(1, dot(a, b))));
+}
+
+// A burn that changes velocity vBefore → vAfter at position r, as [prograde, normal, radial]
+// components in the local frame before the burn.
+export function localComponents(r, vBefore, vAfter) {
+  const f = localFrame(r, vBefore);
+  const d = sub(vAfter, vBefore);
+  return [dot(d, f.pro), dot(d, f.nrm), dot(d, f.rad)];
 }
 
 // Local orbital frame unit vectors: prograde (along v), normal (along h), radial-out.

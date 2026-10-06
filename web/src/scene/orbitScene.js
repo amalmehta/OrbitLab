@@ -76,8 +76,8 @@ export class OrbitScene {
     this.scene.add(sun, new THREE.AmbientLight(0x334466, 0.35));
     this.scene.add(makeStars(5000, 9000));
 
+    // The reference plane is Earth's equator, so Earth's spin axis is the scene's +y.
     this.earth = makeEarth(R_EARTH * KM);
-    this.earth.rotation.z = (23.4 * Math.PI) / 180;
     this.scene.add(this.earth);
     this.moon = makeMoon(R_MOON * KM);
     this.scene.add(this.moon);
@@ -118,10 +118,20 @@ export class OrbitScene {
     this.showLabels = showLabels;
   }
 
-  setTargetRing(radiusKm, color = 0x9dff9d) {
+  // A dashed circular orbit. Physics rotation Rz(node)·Rx(inc) is the scene's Ry(node)·Rx(inc).
+  setTargetRing(radiusKm, color = 0x9dff9d, inc = 0, node = 0) {
     if (this.targetRing) this.scene.remove(this.targetRing);
     this.targetRing = radiusKm ? circle(radiusKm * KM, color, 0.45, true) : null;
-    if (this.targetRing) this.scene.add(this.targetRing);
+    if (this.targetRing) {
+      this.targetRing.rotation.set(inc, node, 0, 'YXZ');
+      this.scene.add(this.targetRing);
+    }
+  }
+
+  // Tilt the Moon's orbit and sphere-of-influence rings (node on +x).
+  setMoonInclination(inc) {
+    this.moonOrbit.rotation.x = inc;
+    this.soi.rotation.x = inc;
   }
 
   setBurns(burns) {

@@ -22,7 +22,7 @@ Orbit Lab/
 │   ├── train-docking.mjs         Trains the docking agent in Node and saves the checkpoint
 │   └── screenshots.mjs           Captures README screenshots in headless Chrome
 ├── tests/
-│   ├── physics.test.mjs          Hohmann numbers, energy conservation, burns, impacts
+│   ├── physics.test.mjs          Hohmann numbers, plane-change split, inclined orbits, energy, impacts
 │   ├── planners.test.mjs         Each planner, flown in the full model
 │   └── rl.test.mjs               Backprop gradient check, environment, PPO learns, pretrained agent, save round-trip
 └── web/
@@ -34,13 +34,13 @@ Orbit Lab/
         ├── dockingController.js  Docking mode: training worker, replays, hand-over, saving your agent
         ├── physics/
         │   ├── constants.js      Earth and Moon constants (km, s)
-        │   ├── orbits.js         Vector maths, Hohmann, orbital elements, Moon ephemeris
+        │   ├── orbits.js         Vector maths, inclined orbits, Hohmann with plane change, elements, tilted Moon
         │   ├── propagator.js     RK4 restricted three-body integrator, impulsive burns
         │   └── flight.js         A flight in progress: time, burns, trail, predicted path
         ├── planners/
-        │   ├── hohmann.js        Two-burn transfer between circular orbits
-        │   ├── gravityAssist.js  Searches the TLI burn time for a target lunar flyby
-        │   └── rendezvous.js     Phasing wait, Newton-targeted transfer, matching burn
+        │   ├── hohmann.js        Two-burn transfer, plane change split between the burns
+        │   ├── gravityAssist.js  Solves burn time and parking node for a target lunar flyby
+        │   └── rendezvous.js     Plane change, phasing wait, Newton-targeted transfer, matching burn
         ├── rl/
         │   ├── mlp.js            Small neural network with backprop and Adam
         │   ├── dockingEnv.js     Clohessy–Wiltshire docking environment and reward

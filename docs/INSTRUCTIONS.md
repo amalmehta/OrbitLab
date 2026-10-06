@@ -36,13 +36,13 @@ Then open http://localhost:8123. The bundle rebuilds itself when you save a file
 Pick a scenario from the tabs at the top (or press ⌘1–⌘4 in the app, 1–4 in a browser).
 
 ### Hohmann Transfer
-Set a start and target altitude, or use a preset: Space station, GPS or Geostationary. The plan updates as you drag. The cyan line is the predicted path and the red dots are the burns. Press **Fly it** to watch it happen; the orange line is where the craft has actually been.
+Set a start and target altitude and inclination. Presets: **Cape Canaveral / Baikonur / Kourou** for the start tilt, and **Space station / GPS / Geostationary** for the target (altitude and tilt together). If the inclinations differ, the plan splits the tilt between the two burns and shows how much that saves over a separate plane change. The plan updates as you drag. The cyan line is the predicted path and the red dots are the burns. Press **Fly it** to watch it happen; the orange line is where the craft has actually been.
 
 ### Gravity Assist
-Choose a parking orbit, how close to pass the Moon, which side to pass on, and how energetic the trans-lunar burn is. Press **Find flyby**. The planner searches through the parking orbit for the moment to fire, and the panel shows the flyby's speed, turn angle and how much energy it gave or took. Arriving at apogee, a pass on either side gains energy. To find a flyby that *loses* energy, raise the burn energy to about 1.3× and pass **in front of** the Moon.
+Choose a parking orbit (altitude and inclination), how close to pass the Moon, which side to pass on, how energetic the trans-lunar burn is, and how tilted the Moon's orbit is (18.3°–28.6°; the tilt applies to every scenario). Press **Find flyby**. The planner picks your parking orbit's node so the Moon is in its plane when you arrive, then searches for the moment to fire. The panel shows the flyby's speed, turn angle, how much energy it gave or took, and how much it tilted your orbit. If the parking inclination is lower than the Moon's angle from the equator at arrival, it tells you how high to go. Arriving at apogee, a pass on either side gains energy. To find a flyby that *loses* energy, raise the burn energy to about 1.3× and pass **in front of** the Moon.
 
 ### Rendezvous
-Set your altitude, the station's altitude and how far ahead the station is. The plan shows how long to wait for the phase angle to line up, then the transfer and matching burns. Press **Fly it**. When you arrive 40 m behind the docking port, press **Hand over to the docking agent →**.
+Set your altitude, the station's altitude, how far ahead the station is, both inclinations, and the station's node offset. If the planes differ, the plan starts with a plane-change burn where they cross. It then shows how long to wait for the phase angle to line up, and the transfer and matching burns. Press **Fly it**. When you arrive 40 m behind the docking port, press **Hand over to the docking agent →**.
 
 ### Docking Agent
 A small neural network flies the last 15–50 m to the docking port.

@@ -28,13 +28,20 @@
   <aside class="panel" id="panel">
     <section data-panel="hohmann">
       <h2>Hohmann Transfer</h2>
-      <p class="lede">Two burns move you between circular orbits for the least Δv: one to enter an ellipse that touches both orbits, one to circularize at the far side.</p>
+      <p class="lede">Two burns move you between circular orbits for the least Δv: one to enter an ellipse that touches both orbits, one to circularize at the far side. Changing inclination too? The tilt is split between the burns, mostly at the far, slow one.</p>
       <div class="field"><label for="h-start">Start altitude</label><output data-for="h-start"></output>
         <input type="range" id="h-start" min="200" max="2000" step="10" value="400"></div>
+      <div class="field"><label for="h-start-inc">Start inclination</label><output data-for="h-start-inc"></output>
+        <input type="range" id="h-start-inc" min="0" max="90" step="0.1" value="28.5"></div>
+      <div class="presets" data-target="h-start-inc">
+        <button data-value="28.5">Cape Canaveral</button><button data-value="51.6">Baikonur</button><button data-value="5.2">Kourou</button>
+      </div>
       <div class="field"><label for="h-target">Target altitude</label><output data-for="h-target"></output>
         <input type="range" id="h-target" min="300" max="40000" step="1" value="35786"></div>
-      <div class="presets" data-target="h-target">
-        <button data-value="420">Space station</button><button data-value="20200">GPS</button><button data-value="35786">Geostationary</button>
+      <div class="field"><label for="h-target-inc">Target inclination</label><output data-for="h-target-inc"></output>
+        <input type="range" id="h-target-inc" min="0" max="90" step="0.1" value="0"></div>
+      <div class="presets" data-target="h-target" data-target2="h-target-inc">
+        <button data-value="420" data-value2="51.6">Space station</button><button data-value="20200" data-value2="55">GPS</button><button data-value="35786" data-value2="0">Geostationary</button>
       </div>
       <dl class="readout" id="h-readout"></dl>
       <div class="actions"><button class="primary" data-action="fly">Fly it</button><button data-action="replan">Reset</button></div>
@@ -42,13 +49,17 @@
 
     <section data-panel="assist" hidden>
       <h2>Gravity Assist</h2>
-      <p class="lede">Swing past the Moon to change your orbit around Earth without burning fuel. The planner searches for when to fire so you pass at the altitude and side you choose.</p>
+      <p class="lede">Swing past the Moon to change your orbit around Earth without burning fuel. The planner picks your parking orbit's node so the Moon is in its plane when you arrive, then searches for when to fire so you pass at the altitude and side you choose.</p>
       <div class="field"><label for="a-parking">Parking orbit altitude</label><output data-for="a-parking"></output>
         <input type="range" id="a-parking" min="160" max="1000" step="10" value="200"></div>
+      <div class="field"><label for="a-inc">Parking orbit inclination</label><output data-for="a-inc"></output>
+        <input type="range" id="a-inc" min="0" max="90" step="0.5" value="28.5"></div>
       <div class="field"><label for="a-flyby">Closest approach to the Moon</label><output data-for="a-flyby"></output>
         <input type="range" id="a-flyby" min="100" max="15000" step="50" value="2000"></div>
       <div class="field"><label for="a-apogee">Trans-lunar burn energy</label><output data-for="a-apogee"></output>
         <input type="range" id="a-apogee" min="1" max="1.5" step="0.01" value="1"></div>
+      <div class="field"><label for="a-moon">Moon's orbit tilt to the equator</label><output data-for="a-moon"></output>
+        <input type="range" id="a-moon" min="18.3" max="28.6" step="0.1" value="28"></div>
       <div class="field"><span class="field-label">Pass the Moon</span>
         <div class="segmented" id="a-side" role="radiogroup">
           <button data-value="trailing" aria-pressed="true">Behind it</button>
@@ -60,13 +71,19 @@
 
     <section data-panel="rendezvous" hidden>
       <h2>Rendezvous</h2>
-      <p class="lede">Catch a space station: wait until it leads by just the right angle, transfer up, and match its velocity. You arrive 40 m behind the docking port.</p>
+      <p class="lede">Catch a space station: line up your orbit's plane with its plane if they differ, wait until it leads by just the right angle, transfer up, and match its velocity. You arrive 40 m behind the docking port.</p>
       <div class="field"><label for="r-chaser">Your altitude</label><output data-for="r-chaser"></output>
         <input type="range" id="r-chaser" min="200" max="400" step="5" value="300"></div>
       <div class="field"><label for="r-station">Station altitude</label><output data-for="r-station"></output>
         <input type="range" id="r-station" min="350" max="600" step="5" value="420"></div>
       <div class="field"><label for="r-phase">Station ahead of you by</label><output data-for="r-phase"></output>
         <input type="range" id="r-phase" min="0" max="359" step="1" value="40"></div>
+      <div class="field"><label for="r-chaser-inc">Your inclination</label><output data-for="r-chaser-inc"></output>
+        <input type="range" id="r-chaser-inc" min="0" max="90" step="0.1" value="51"></div>
+      <div class="field"><label for="r-station-inc">Station inclination</label><output data-for="r-station-inc"></output>
+        <input type="range" id="r-station-inc" min="0" max="90" step="0.1" value="51.6"></div>
+      <div class="field"><label for="r-node">Station's node offset</label><output data-for="r-node"></output>
+        <input type="range" id="r-node" min="-10" max="10" step="0.1" value="0.4"></div>
       <dl class="readout" id="r-readout"></dl>
       <div class="actions"><button class="primary" data-action="fly">Fly it</button><button data-action="replan">Reset</button></div>
       <button class="handover" data-action="handover" hidden>Hand over to the docking agent →</button>

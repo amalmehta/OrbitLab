@@ -5,8 +5,8 @@ import { Propagator } from './propagator.js';
 import { elements } from './orbits.js';
 
 export class Flight {
-  constructor({ craft, station = null, burns = [], moonPhase0 = 1.9, t0 = 0 }) {
-    this.prop = new Propagator({ moonPhase0 });
+  constructor({ craft, station = null, burns = [], moonPhase0 = 1.9, moonInc, t0 = 0 }) {
+    this.prop = new Propagator({ moonPhase0, moonInc });
     this.t = t0;
     this.craft = Float64Array.from(craft);
     this.station = station ? Float64Array.from(station) : null;

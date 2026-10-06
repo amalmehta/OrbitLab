@@ -3,18 +3,19 @@
 // accelerates toward the Moon). Fixed-step RK4 with a step size that adapts to the
 // distance from whichever body is closest in "dynamical time".
 
-import { MU_EARTH, MU_MOON, MOON_ORBIT, R_EARTH, R_MOON } from './constants.js';
+import { MU_EARTH, MU_MOON, MOON_ORBIT, R_EARTH, R_MOON, MOON_INC_DEFAULT } from './constants.js';
 import { moonState, localFrame, add, scale } from './orbits.js';
 
 export class Propagator {
-  constructor({ moonPhase0 = 0, moon = true, accuracy = 0.01 } = {}) {
+  constructor({ moonPhase0 = 0, moonInc = MOON_INC_DEFAULT, moon = true, accuracy = 0.01 } = {}) {
     this.moonPhase0 = moonPhase0;
+    this.moonInc = moonInc;
     this.moon = moon;
     this.accuracy = accuracy; // fraction of the local dynamical time per step
   }
 
   moonAt(t) {
-    return moonState(t, this.moonPhase0);
+    return moonState(t, this.moonPhase0, this.moonInc);
   }
 
   accel(t, s, out) {

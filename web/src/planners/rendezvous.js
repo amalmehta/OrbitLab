@@ -1,15 +1,17 @@
 // Rendezvous planner: a chaser in a lower circular orbit catches a station in a higher one.
+//   0. If the two orbits are in different planes (inclination or node), a plane-change burn
+//      where the planes cross rotates the chaser's velocity into the station's plane.
 //   1. Wait in the parking orbit until the station leads by the right phase angle.
 //   2. Transfer burn (Hohmann), refined by Newton's method on the full numerical model so the
 //      chaser arrives at an aim point a few tens of metres behind the station's docking port.
 //   3. Matching burn at arrival that zeroes the velocity relative to the station.
 // After step 3 the chaser sits at the start of the docking corridor, ready for the RL agent.
 
-import { R_EARTH } from '../physics/constants.js';
-import { hohmann, circularState, circularSpeed, wrapAngle, localFrame, sub, norm, add, scale, unit, cross, dot } from '../physics/orbits.js';
+import { R_EARTH, MU_EARTH, DEG, MOON_INC_DEFAULT } from '../physics/constants.js';
+import { hohmann, circularState, circularSpeed, planeAxes, wrapAngle, localFrame, sub, norm, add, scale, unit, cross, dot } from '../physics/orbits.js';
 import { Propagator, toState } from '../physics/propagator.js';
 
-export const RENDEZVOUS_DEFAULTS = { chaserAlt: 300, stationAlt: 420, phaseDeg: 40, aimBehind: 40 };
+export const RENDEZVOUS_DEFAULTS = { chaserAlt: 300, stationAlt: 420, phaseDeg: 40, chaserInc: 51.0, stationInc: 51.6, nodeOffset: 0.4, aimBehind: 40 };
 
 // Station local frame (LVLH): x radial out, y along-track, z orbit normal. Returns m and m/s.
 export function relativeLVLH(chaser, station) {
@@ -30,26 +32,60 @@ function aimPoint(station, behindKm) {
   return add(r, scale(unit(v), -behindKm));
 }
 
-export function planRendezvous({ chaserAlt, stationAlt, phaseDeg, aimBehind = 40, t0 = 0, moonPhase0 = 1.9 }) {
+export function planRendezvous({ chaserAlt, stationAlt, phaseDeg, chaserInc = 51.6, stationInc = 51.6, nodeOffset = 0, aimBehind = 40, t0 = 0, moonPhase0 = 1.9, moonInc = MOON_INC_DEFAULT }) {
   const r1 = R_EARTH + chaserAlt, r2 = R_EARTH + stationAlt;
-  const chaser0 = toState(...Object.values(circularState(r1, 0)));
-  const station0 = toState(...Object.values(circularState(r2, (phaseDeg * Math.PI) / 180)));
+  const iC = chaserInc * DEG, iS = stationInc * DEG, dO = nodeOffset * DEG;
+  // The station starts phaseDeg ahead, measured from its own ascending node.
+  const c0 = circularState(r1, 0, MU_EARTH, iC, 0), s0 = circularState(r2, phaseDeg * DEG, MU_EARTH, iS, dO);
+  const chaser0 = toState(c0.r, c0.v), station0 = toState(s0.r, s0.v);
+  const prop = new Propagator({ moonPhase0, moonInc });
+  const burns = [];
+
+  // 0. Plane change at the first crossing of the two planes, at least 10 minutes from now.
+  const C = planeAxes(iC, 0), S = planeAxes(iS, dO);
+  const planeDiff = Math.acos(Math.max(-1, Math.min(1, dot(C.W, S.W))));
+  let tStart = t0, planeChangeDv = 0;
+  const chaser = Float64Array.from(chaser0), station = Float64Array.from(station0);
+  if (planeDiff > 1e-7) {
+    const line = unit(cross(C.W, S.W));
+    const uNode = Math.atan2(dot(line, C.Q), dot(line, C.P));
+    const n1 = circularSpeed(r1) / r1;
+    let tNode = Infinity;
+    for (let k = -2; k < 6; k++) {
+      // the chaser starts at u = 0; the planes cross at uNode and uNode + π (repeating each orbit)
+      const t = t0 + (wrapAngle(uNode + (k % 2) * Math.PI) + Math.floor(k / 2) * 2 * Math.PI) / n1;
+      if (t >= t0 + 600 && t < tNode) tNode = t;
+    }
+    if (!isFinite(tNode)) tNode = t0 + 600 + Math.PI / n1;
+    prop.propagate(chaser, t0, tNode);
+    prop.propagate(station, t0, tNode);
+    const r = [chaser[0], chaser[1], chaser[2]], v = [chaser[3], chaser[4], chaser[5]];
+    // Same speed, now heading along the station's plane.
+    const vNew = scale(unit(cross(S.W, unit(r))), norm(v));
+    const dvPlane = sub(vNew, v);
+    planeChangeDv = norm(dvPlane);
+    burns.push({ t: tNode, dvInertial: dvPlane, label: 'Plane change' });
+    chaser[3] = vNew[0]; chaser[4] = vNew[1]; chaser[5] = vNew[2];
+    tStart = tNode;
+  }
+
   const h = hohmann(r1, r2);
   const n1 = circularSpeed(r1) / r1, n2 = circularSpeed(r2) / r2;
   const phiReq = wrapAngle(Math.PI - n2 * h.tof);
-  const phi0 = wrapAngle((phaseDeg * Math.PI) / 180);
+  // Current lead of the station over the chaser, measured around the station's orbit normal.
+  const rc = [chaser[0], chaser[1], chaser[2]], rs = [station[0], station[1], station[2]];
+  const phi0 = wrapAngle(Math.atan2(dot(S.W, cross(rc, rs)), dot(rc, rs)));
   const rate = n2 - n1;
   if (Math.abs(rate) < 1e-9) return { ok: false, reason: 'Orbits are the same height — phasing would take forever.' };
   const wait = rate < 0 ? wrapAngle(phi0 - phiReq) / -rate : wrapAngle(phiReq - phi0) / rate;
-  const tBurn = t0 + Math.max(wait, 60);
+  const tBurn = tStart + Math.max(wait, 60);
   const tArrive = tBurn + h.tof;
 
-  const prop = new Propagator({ moonPhase0 });
   // Where the station and chaser are at the burn and at arrival.
-  const sAtBurn = Float64Array.from(chaser0);
-  prop.propagate(sAtBurn, t0, tBurn);
-  const stAtArrive = Float64Array.from(station0);
-  prop.propagate(stAtArrive, t0, tArrive);
+  const sAtBurn = Float64Array.from(chaser);
+  prop.propagate(sAtBurn, tStart, tBurn);
+  const stAtArrive = Float64Array.from(station);
+  prop.propagate(stAtArrive, tStart, tArrive);
   const target = aimPoint(stAtArrive, aimBehind / 1000);
 
   // Newton iteration on the in-plane Δv (prograde, radial) at the burn so the arrival position
@@ -85,12 +121,17 @@ export function planRendezvous({ chaserAlt, stationAlt, phaseDeg, aimBehind = 40
   const dvMatch = sub([stAtArrive[3], stAtArrive[4], stAtArrive[5]], [sArr[3], sArr[4], sArr[5]]);
   return {
     ok: true,
-    r1, r2, wait: tBurn - t0, tof: h.tof, phiReqDeg: (phiReq * 180) / Math.PI,
+    r1, r2, wait: tBurn - tStart, tof: h.tof, phiReqDeg: (phiReq * 180) / Math.PI,
     hohmannDv: h.total,
-    totalDv: norm(dv) + norm(dvMatch),
+    planeDiffDeg: planeDiff / DEG,
+    planeChangeDv,
+    planeChangeTime: burns.length ? burns[0].t : null,
+    stationInc, stationNode: nodeOffset,
+    totalDv: planeChangeDv + norm(dv) + norm(dvMatch),
     missMeters: miss * 1000,
-    chaser0, station0, moonPhase0,
+    chaser0, station0, moonPhase0, moonInc,
     burns: [
+      ...burns,
       { t: tBurn, dvInertial: dv, label: 'Transfer burn' },
       { t: tArrive, dvInertial: dvMatch, label: 'Match velocity' },
     ],

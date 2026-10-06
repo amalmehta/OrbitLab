@@ -65,7 +65,8 @@ OPEN QUESTIONS / ASSUMPTIONS:
 Asked and answered (2026-10-06): Mac shell = Swift + WKWebView; RL agent trains live in the app and ships pretrained; world = Earth + Moon + station; public GitHub repo OrbitLab.
 
 Decided without asking:
-- Physics: restricted three-body (Earth fixed, Moon on a circular orbit in the same plane), RK4, impulsive burns. No Sun, J2, drag or plane changes.
+- Physics: restricted three-body in Earth's equatorial frame (Earth fixed, Moon on a circular orbit tilted 18.3°–28.6°, default 28°), RK4, impulsive burns. No lunar eccentricity or node precession, Sun, J2 or drag.
+- Out-of-plane maneuvers (asked and answered 2026-10-06): Hohmann splits the plane change optimally between its two burns; the lunar flyby picks the parking orbit's node to contain the Moon's arrival position and solves burn time + node together; rendezvous does a separate plane-change burn where the planes cross, then plans coplanar.
 - Gravity assist: you choose which side of the Moon to pass, not "gain/lose energy". Arriving near apogee, both sides gain energy, so the panel reports the true change. A hotter TLI (about 1.3×) plus a leading-side pass loses energy.
 - Rendezvous delivers the chaser 40 m behind the docking port, at rest, which is where the docking agent takes over.
 - Docking: Clohessy–Wiltshire dynamics, translation only, 3-axis thrust up to 0.04 m/s², soft dock = within 0.5 m at under 0.25 m/s. Starts 15–50 m out in a 35° cone.
@@ -75,7 +76,8 @@ Decided without asking:
 - Dark theme only. Bundle id com.amalmehta.orbitlab. Not notarized (ad-hoc signed for local use).
 
 Proposals (not done; say the word):
-- Lunar inclination/eccentricity and out-of-plane maneuvers.
+- Lunar eccentricity and node precession.
+- Combining the rendezvous plane change with the transfer burn, and over-the-pole lunar flybys.
 
 CHANGELOG:
 
@@ -99,3 +101,4 @@ CHANGELOG:
 - 2026-10-06 — built v1.0: Mac app with Hohmann, gravity-assist and rendezvous planners, plus a live-training PPO docking agent; docs, tests, GitHub repo
 - 2026-10-06 — website step: published to GitHub Pages via a build-and-deploy workflow
 - 2026-10-06 — trained docking agents are saved between launches (Mac app and website), with a setting to turn it off
+- 2026-10-06 — lunar inclination (equatorial frame, Moon tilt slider) and out-of-plane maneuvers in all three planners
