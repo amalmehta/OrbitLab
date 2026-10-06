@@ -17,6 +17,12 @@ open "build/Orbit Lab.app"
 
 `npm run mac` bundles the web code, compiles the Swift shell, draws the icon and puts **Orbit Lab.app** in `build/`. Drag it to Applications if you want to keep it.
 
+## Use the website
+
+Open **https://amalmehta.github.io/OrbitLab/**. It's the same app as the Mac version. In a browser, settings and feedback are kept in local storage, and the gear button opens Settings (some browsers keep ⌘, for themselves).
+
+The site rebuilds and redeploys automatically on every push to `main` (see `.github/workflows/pages.yml`). To redeploy by hand: GitHub ▸ Actions ▸ Website ▸ Run workflow.
+
 ## Run in a browser (for development)
 
 ```bash

@@ -5,6 +5,7 @@ Orbit Lab/
 ├── README.md                     Screenshots and links
 ├── Orbit Lab.md                  Project brief, deliverables, assumptions, changelog
 ├── package.json                  npm scripts: dev, build, test, train, mac
+├── .github/workflows/pages.yml   Builds web/ and publishes the website to GitHub Pages
 ├── docs/
 │   ├── INSTRUCTIONS.md           Setup, run, use
 │   ├── SYSTEM-DESIGN.md          Architecture, flows, decisions, limits

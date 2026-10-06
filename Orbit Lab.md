@@ -56,6 +56,7 @@ DELIVERABLES:
 - tests/ — physics, planner and RL tests (`npm test`)
 - README.md, docs/INSTRUCTIONS.md, docs/SYSTEM-DESIGN.md, docs/FILE-STRUCTURE.md
 - https://github.com/amalmehta/OrbitLab — public repo
+- https://amalmehta.github.io/OrbitLab/ — the website (GitHub Pages, deployed by .github/workflows/pages.yml)
 
 OPEN QUESTIONS / ASSUMPTIONS:
 
@@ -74,7 +75,6 @@ Decided without asking:
 - Dark theme only. Bundle id com.amalmehta.orbitlab. Not notarized (ad-hoc signed for local use).
 
 Proposals (not done; say the word):
-- The website step: deploy web/ to GitHub Pages as its own build.
 - Save agents trained in the app between launches.
 - Lunar inclination/eccentricity and out-of-plane maneuvers.
 
@@ -98,3 +98,4 @@ CHANGELOG:
 - 2026-10-02 — added a DELIVERABLES field after CONTEXT
 - 2026-10-02 — added meta-instruction: every project has a system design doc at docs/SYSTEM-DESIGN.md
 - 2026-10-05 — added meta-instruction: applications include a settings button or tab
+- 2026-10-06 — website step: published to GitHub Pages via a build-and-deploy workflow

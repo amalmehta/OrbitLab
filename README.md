@@ -14,6 +14,7 @@ flowchart LR
   F -->|arrive 40 m behind the port| D[Docking agent<br/>PPO, trains live]
 ```
 
+- **[Try it in your browser](https://amalmehta.github.io/OrbitLab/)**
 - **[How to set up, run and use it](docs/INSTRUCTIONS.md)**
 - **[System design](docs/SYSTEM-DESIGN.md)**: architecture, physics, RL and trade-offs
 - **[What's where](docs/FILE-STRUCTURE.md)**

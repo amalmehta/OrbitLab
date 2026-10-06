@@ -1,6 +1,6 @@
 # Orbit Lab: System Design
 
-Orbit Lab is a three.js app wrapped in a native macOS shell. Everything runs locally: the physics, the planners, the 3D views and the reinforcement-learning trainer are all JavaScript inside one web view, and the Swift shell supplies the window, the menus and storage.
+Orbit Lab is a three.js app wrapped in a native macOS shell, and also published as a website on GitHub Pages. Everything runs locally: the physics, the planners, the 3D views and the reinforcement-learning trainer are all JavaScript inside one web view, and the Swift shell supplies the window, the menus and storage.
 
 ## Architecture
 
@@ -61,6 +61,8 @@ flowchart TB
 
 **Live training.** **Train** posts `start` to the worker. Each PPO iteration (2,048 samples) posts weights back, and the main thread copies them into its replay policy. Replays run the deterministic policy (the mean action), so what you see is the agent's current best guess. Ended replays leave faded trails, keeping the last 12.
 
+**Website deploy.** A push to `main` runs `.github/workflows/pages.yml`: `npm ci`, `npm run build`, then `index.html`, `styles.css` and `dist/app.js` are uploaded as the Pages artifact and deployed to https://amalmehta.github.io/OrbitLab/. The page detects that it isn't inside the Mac app (`isMacApp()` is false) and uses localStorage for settings and feedback.
+
 **Settings and feedback.** `settings.set` → `saveStored` → in the Mac app a `store` message to UserDefaults (injected as `window.__ORBIT_LAB_STORE__` on the next launch), in a browser localStorage.
 
 ## Where data lives
@@ -81,6 +83,7 @@ flowchart TB
 - **Fixed-step RK4 with an adaptive step instead of an embedded adaptive method.** Simple and predictable, and lands exactly on burn times. Energy drift is under 10⁻⁷ per LEO orbit.
 - **Gravity assist chosen by side, not by "gain or lose".** Arriving near apogee, the Moon-relative velocity points almost backwards, so either side *gains* energy. Labelling the choice "lose energy" would be wrong. The panel reports the true sign instead.
 - **Clohessy–Wiltshire for docking, numerical orbits for rendezvous.** CW is exact enough within 100 m and cheap enough to train on. The hand-over converts the full-model state into the CW frame.
+- **Website built in CI, not committed.** `web/dist/` stays out of git, and the Pages workflow builds it, so the site always matches `main`. Cost: a deploy needs a successful CI run (about a minute).
 - **Procedural textures instead of image files.** WebGL can't read `file://` images in WKWebView (cross-origin), so textures are painted in workers. Cost: about 3–5 s on an Intel i9 before textures appear (plain colours until then).
 
 ## Testing
@@ -99,4 +102,4 @@ flowchart TB
 - Training in the app isn't saved between launches.
 - WebKit pauses rendering when the window is hidden, so flights pause too.
 - Startup textures take a few seconds on older Macs.
-- There's no website build or hosting yet; that's the next step.
+- The website has no Mac menu, so Help and ⌘1–4 are Mac-only (the browser uses 1–4).
