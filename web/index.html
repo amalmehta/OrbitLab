@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Orbit Lab</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark"></span>Orbit Lab</div>
+    <nav class="modes" role="tablist" aria-label="Scenarios">
+      <button role="tab" data-mode="hohmann" title="Hohmann Transfer (1)">Hohmann Transfer</button>
+      <button role="tab" data-mode="assist" title="Gravity Assist (2)">Gravity Assist</button>
+      <button role="tab" data-mode="rendezvous" title="Rendezvous (3)">Rendezvous</button>
+      <button role="tab" data-mode="docking" title="Docking Agent (4)">Docking Agent</button>
+    </nav>
+    <div class="clock" id="clock-controls">
+      <button class="icon" data-action="pause" title="Play / pause (Space)" aria-label="Play or pause">▶</button>
+      <button class="icon" data-action="slower" title="Slower (,)" aria-label="Slower">«</button>
+      <span class="warp" id="warp">1,000×</span>
+      <button class="icon" data-action="faster" title="Faster (.)" aria-label="Faster">»</button>
+      <span class="time" id="clock">T+ 0s</span>
+    </div>
+    <button class="icon settings-btn" data-action="settings" title="Settings (⌘,)" aria-label="Settings"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+  </header>
+
+  <aside class="panel" id="panel">
+    <section data-panel="hohmann">
+      <h2>Hohmann Transfer</h2>
+      <p class="lede">Two burns move you between circular orbits for the least Δv: one to enter an ellipse that touches both orbits, one to circularize at the far side.</p>
+      <div class="field"><label for="h-start">Start altitude</label><output data-for="h-start"></output>
+        <input type="range" id="h-start" min="200" max="2000" step="10" value="400"></div>
+      <div class="field"><label for="h-target">Target altitude</label><output data-for="h-target"></output>
+        <input type="range" id="h-target" min="300" max="40000" step="1" value="35786"></div>
+      <div class="presets" data-target="h-target">
+        <button data-value="420">Space station</button><button data-value="20200">GPS</button><button data-value="35786">Geostationary</button>
+      </div>
+      <dl class="readout" id="h-readout"></dl>
+      <div class="actions"><button class="primary" data-action="fly">Fly it</button><button data-action="replan">Reset</button></div>
+    </section>
+
+    <section data-panel="assist" hidden>
+      <h2>Gravity Assist</h2>
+      <p class="lede">Swing past the Moon to change your orbit around Earth without burning fuel. The planner searches for when to fire so you pass at the altitude and side you choose.</p>
+      <div class="field"><label for="a-parking">Parking orbit altitude</label><output data-for="a-parking"></output>
+        <input type="range" id="a-parking" min="160" max="1000" step="10" value="200"></div>
+      <div class="field"><label for="a-flyby">Closest approach to the Moon</label><output data-for="a-flyby"></output>
+        <input type="range" id="a-flyby" min="100" max="15000" step="50" value="2000"></div>
+      <div class="field"><label for="a-apogee">Trans-lunar burn energy</label><output data-for="a-apogee"></output>
+        <input type="range" id="a-apogee" min="1" max="1.5" step="0.01" value="1"></div>
+      <div class="field"><span class="field-label">Pass the Moon</span>
+        <div class="segmented" id="a-side" role="radiogroup">
+          <button data-value="trailing" aria-pressed="true">Behind it</button>
+          <button data-value="leading" aria-pressed="false">In front of it</button>
+        </div></div>
+      <div class="actions"><button class="primary" data-action="find-flyby">Find flyby</button><button data-action="fly" disabled>Fly it</button></div>
+      <dl class="readout" id="a-readout"></dl>
+    </section>
+
+    <section data-panel="rendezvous" hidden>
+      <h2>Rendezvous</h2>
+      <p class="lede">Catch a space station: wait until it leads by just the right angle, transfer up, and match its velocity. You arrive 40 m behind the docking port.</p>
+      <div class="field"><label for="r-chaser">Your altitude</label><output data-for="r-chaser"></output>
+        <input type="range" id="r-chaser" min="200" max="400" step="5" value="300"></div>
+      <div class="field"><label for="r-station">Station altitude</label><output data-for="r-station"></output>
+        <input type="range" id="r-station" min="350" max="600" step="5" value="420"></div>
+      <div class="field"><label for="r-phase">Station ahead of you by</label><output data-for="r-phase"></output>
+        <input type="range" id="r-phase" min="0" max="359" step="1" value="40"></div>
+      <dl class="readout" id="r-readout"></dl>
+      <div class="actions"><button class="primary" data-action="fly">Fly it</button><button data-action="replan">Reset</button></div>
+      <button class="handover" data-action="handover" hidden>Hand over to the docking agent →</button>
+    </section>
+
+    <section data-panel="docking" hidden>
+      <h2>Docking Agent</h2>
+      <p class="lede">A neural-network pilot learns to dock by trial and error (PPO reinforcement learning). Each replay uses its latest policy; faded lines are earlier attempts.</p>
+      <dl class="stats" id="d-stats"></dl>
+      <canvas class="chart" id="d-chart"></canvas>
+      <div class="actions">
+        <button class="primary" data-action="train">Train</button>
+        <button data-action="pretrained">Load pretrained</button>
+        <button data-action="scratch">Start from scratch</button>
+      </div>
+      <div class="field inline"><label for="d-speed">Replay speed</label>
+        <select id="d-speed"><option value="1">Real time</option><option value="5">5×</option><option value="20">20×</option><option value="60">60×</option></select></div>
+      <h3>Current replay</h3>
+      <dl class="readout" id="d-readout"></dl>
+    </section>
+  </aside>
+
+  <main id="viewport">
+    <canvas id="gl"></canvas>
+    <div id="labels"></div>
+    <div class="focus" id="focus" role="group" aria-label="Camera focus">
+      <span>Focus</span>
+      <button data-focus="earth">Earth</button><button data-focus="moon">Moon</button><button data-focus="craft">Spacecraft</button>
+    </div>
+    <ol class="log" id="log"></ol>
+    <div class="banner" id="banner" hidden></div>
+    <div class="toast" id="toast" hidden></div>
+  </main>
+
+  <button class="feedback-tab" id="feedback-tab">Feedback</button>
+  <div class="feedback-panel" id="feedback-panel" hidden>
+    <div class="feedback-head"><strong>Send feedback</strong><button class="icon" data-action="close-feedback" aria-label="Close">✕</button></div>
+    <textarea rows="5" placeholder="What worked, what didn't, what you'd like…"></textarea>
+    <div class="actions"><button class="primary" data-action="save-feedback">Save</button><button data-action="issue-feedback">Open as GitHub issue</button></div>
+    <p class="feedback-status"></p>
+  </div>
+
+  <div class="sheet-backdrop" id="settings" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div class="sheet-head"><h2 id="settings-title">Settings</h2><button class="icon" data-action="close-settings" aria-label="Close">✕</button></div>
+      <div class="sheet-body"></div>
+      <div class="sheet-foot"><button data-action="reset-settings">Restore defaults</button><button class="primary" data-action="close-settings">Done</button></div>
+    </div>
+  </div>
+
+  <script src="dist/app.js"></script>
+</body>
+</html>
