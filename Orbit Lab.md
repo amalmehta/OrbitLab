@@ -81,7 +81,6 @@ Proposals (not done; say the word):
 CHANGELOG:
 
 - 2026-10-06 — created
-- 2026-10-06 — built v1.0: Mac app with Hohmann, gravity-assist and rendezvous planners, plus a live-training PPO docking agent; docs, tests, GitHub repo
 - 2026-09-15 — added meta-instruction: built-out applications include a small feedback tab
 - 2026-09-15 — added meta-instruction: no "Claude" attribution in commits, PRs, or branches
 - 2026-09-16 — added meta-instruction: always include a README when adding to GitHub
@@ -98,4 +97,5 @@ CHANGELOG:
 - 2026-10-02 — added a DELIVERABLES field after CONTEXT
 - 2026-10-02 — added meta-instruction: every project has a system design doc at docs/SYSTEM-DESIGN.md
 - 2026-10-05 — added meta-instruction: applications include a settings button or tab
+- 2026-10-06 — built v1.0: Mac app with Hohmann, gravity-assist and rendezvous planners, plus a live-training PPO docking agent; docs, tests, GitHub repo
 - 2026-10-06 — website step: published to GitHub Pages via a build-and-deploy workflow
