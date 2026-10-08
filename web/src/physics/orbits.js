@@ -1,6 +1,6 @@
 // Two-body orbital mechanics helpers. Vectors are plain [x, y, z] arrays in km and km/s.
 
-import { MU_EARTH, MOON_ORBIT, MOON_RATE } from './constants.js';
+import { MU_EARTH, MOON_ORBIT, DEG, OBLIQUITY } from './constants.js';
 
 export const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 export const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -77,14 +77,47 @@ export function circularState(radius, u, mu = MU_EARTH, inc = 0, raan = 0) {
   };
 }
 
-// The Moon on a circular orbit tilted by inc to the equator, ascending node on +x.
-// phase0 = argument of latitude at t = 0.
-export function moonState(t, phase0 = 0, inc = 0) {
-  const u = phase0 + MOON_RATE * t;
-  const s = circularState(MOON_ORBIT, u, MU_EARTH, inc, 0);
-  const k = (MOON_ORBIT * MOON_RATE) / norm(s.v); // circular speed uses μ_E; the Moon's rate uses μ_E + μ_M
-  return { r: s.r, v: scale(s.v, k), angle: u };
+// The Moon's geocentric orbit from mean orbital elements (Schlyter's low-precision lunar theory):
+// an ellipse (e = 0.0549) inclined 5.145° to the ecliptic, whose node regresses once every 18.6
+// years and whose perigee advances once every 8.85 years. Accurate to about a degree (the big
+// periodic terms such as evection are left out, so positions can be a few degrees off). Returns equatorial position (km) and velocity
+// (km/s) for an epoch in days since J2000, plus the orbit normal.
+const MOON_E = 0.0549, MOON_I = 5.1454 * DEG;
+const NODE_RATE = -0.0529538083 * DEG, PERI_RATE = 0.1643573223 * DEG, MEAN_RATE = 13.0649929509 * DEG; // rad/day
+export function moonEphemeris(days) {
+  const N = 125.1228 * DEG + NODE_RATE * days;
+  const w = 318.0634 * DEG + PERI_RATE * days;
+  const M = 115.3654 * DEG + MEAN_RATE * days;
+  let E = M;
+  for (let k = 0; k < 5; k++) E -= (E - MOON_E * Math.sin(E) - M) / (1 - MOON_E * Math.cos(E));
+  const nu = 2 * Math.atan2(Math.sqrt(1 + MOON_E) * Math.sin(E / 2), Math.sqrt(1 - MOON_E) * Math.cos(E / 2));
+  const r = MOON_ORBIT * (1 - MOON_E * Math.cos(E));
+  const u = nu + w; // argument of latitude
+  const cN = Math.cos(N), sN = Math.sin(N), ci = Math.cos(MOON_I), si = Math.sin(MOON_I);
+  // unit vectors in the ecliptic frame: radial, transverse, normal
+  const cu = Math.cos(u), su = Math.sin(u);
+  const ur = [cN * cu - sN * su * ci, sN * cu + cN * su * ci, su * si];
+  const ut = [-cN * su - sN * cu * ci, -sN * su + cN * cu * ci, cu * si];
+  const un = [sN * si, -cN * si, ci];
+  // Kepler speeds at the Moon's observed mean motion (the Sun slows it slightly from pure
+  // two-body), plus the slow turning of the ellipse itself, so velocity matches the positions.
+  const k = (MEAN_RATE / 86400) * MOON_ORBIT / Math.sqrt(1 - MOON_E * MOON_E);
+  const vr = k * MOON_E * Math.sin(nu);
+  const vt = k * (1 + MOON_E * Math.cos(nu)) + (r * (PERI_RATE + NODE_RATE * ci)) / 86400;
+  const toEq = (x) => [x[0], x[1] * Math.cos(OBLIQUITY) - x[2] * Math.sin(OBLIQUITY), x[1] * Math.sin(OBLIQUITY) + x[2] * Math.cos(OBLIQUITY)];
+  return {
+    r: toEq(scale(ur, r)),
+    v: toEq(add(scale(ur, vr), scale(ut, vt))),
+    normal: toEq(un),
+    angle: u,
+  };
 }
+
+// Moon state at t seconds after the epoch (days since J2000).
+export const moonState = (t, epoch) => moonEphemeris(epoch + t / 86400);
+
+// Tilt of the Moon's orbit to the equator on a given day, in degrees (18.3°–28.6° over 18.6 years).
+export const moonInclinationDeg = (epoch) => Math.acos(moonEphemeris(epoch).normal[2]) / DEG;
 
 // Δv for a two-burn Hohmann transfer that also changes inclination by di (radians), with the
 // plane change split between the burns to minimise the total. Burns happen at the nodes.

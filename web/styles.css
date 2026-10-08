@@ -51,7 +51,9 @@ button, select, input, textarea { font: inherit; color: inherit; }
 .modes button { border: 0; background: none; padding: 5px 12px; border-radius: 6px; color: var(--ink-2); cursor: pointer; white-space: nowrap; }
 .modes button:hover { color: var(--ink); }
 .modes button[aria-selected="true"] { background: var(--line); color: var(--ink); }
-.clock { margin-left: auto; display: flex; align-items: center; gap: 6px; min-width: 0; flex: 0 1 auto; }
+.launch-date { margin-left: auto; display: flex; align-items: center; gap: 6px; color: var(--ink-2); white-space: nowrap; }
+.launch-date input { background: var(--raise); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; color: var(--ink); color-scheme: dark; }
+.clock { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 0 1 auto; }
 .settings-btn { flex: none; }
 .warp { min-width: 72px; text-align: center; font-family: var(--mono); color: var(--accent); }
 .time { font-family: var(--mono); color: var(--ink-2); min-width: 0; max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -73,7 +75,7 @@ select { background: var(--raise); border: 1px solid var(--line); border-radius:
 .presets { display: flex; gap: 6px; margin: -4px 0 14px; flex-wrap: wrap; }
 .presets button, .segmented button { border: 1px solid var(--line); background: var(--raise); border-radius: 999px; padding: 2px 10px; color: var(--ink-2); cursor: pointer; font-size: 12px; }
 .presets button:hover { color: var(--ink); }
-.segmented { display: flex; gap: 6px; }
+.segmented { display: flex; gap: 6px; flex-wrap: wrap; }
 .segmented button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
 .actions { display: flex; gap: 8px; margin: 14px 0; flex-wrap: wrap; }
 .actions button, .handover, .sheet-foot button {

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MU_EARTH, R_EARTH, MOON_SOI, MOON_ORBIT, DEG } from '../web/src/physics/constants.js';
-import { hohmann, hohmannPlaneChange, elements, circularState, moonState, period, localFrame } from '../web/src/physics/orbits.js';
+import { MU_EARTH, R_EARTH, MOON_SOI, DEG, DEFAULT_EPOCH, epochFromDate } from '../web/src/physics/constants.js';
+import { hohmann, hohmannPlaneChange, elements, circularState, moonEphemeris, moonInclinationDeg, period, localFrame } from '../web/src/physics/orbits.js';
 import { Propagator, toState } from '../web/src/physics/propagator.js';
 
 test('Hohmann LEO→GEO matches textbook Δv (≈3.9 km/s)', () => {
@@ -59,10 +59,24 @@ test('inclined circular states have the requested inclination', () => {
   }
 });
 
-test("the Moon's orbit is tilted to the equator by the chosen inclination", () => {
-  const top = moonState(0, Math.PI / 2, 28 * DEG); // 90° past the ascending node
-  assert.ok(Math.abs(top.r[2] - MOON_ORBIT * Math.sin(28 * DEG)) < 1e-6);
-  assert.ok(Math.abs(Math.hypot(...top.v) - Math.hypot(...moonState(1000, 0, 28 * DEG).v)) < 1e-12, 'constant speed');
+test('Moon ephemeris: tilt follows the 18.6-year cycle, distance the eccentric orbit', () => {
+  const at = (y, m, d) => epochFromDate(new Date(Date.UTC(y, m - 1, d)));
+  // major lunar standstills (≈28.6°) in 2006 and early 2025, minor (≈18.3°) in 2015 and 2034
+  assert.ok(moonInclinationDeg(at(2006, 6, 15)) > 28.4);
+  assert.ok(moonInclinationDeg(at(2025, 1, 1)) > 28.4);
+  assert.ok(moonInclinationDeg(at(2015, 10, 1)) < 18.5);
+  assert.ok(moonInclinationDeg(at(2034, 7, 1)) < 18.5);
+  let lo = Infinity, hi = 0;
+  for (let d = 9000; d < 9400; d += 0.25) { const r = Math.hypot(...moonEphemeris(d).r); lo = Math.min(lo, r); hi = Math.max(hi, r); }
+  assert.ok(Math.abs(lo - 363300) < 500 && Math.abs(hi - 405500) < 500, `perigee ${lo}, apogee ${hi}`);
+});
+
+test("Moon ephemeris: velocity matches how fast the position changes", () => {
+  for (const d of [DEFAULT_EPOCH, 1234.5, 9876.25]) {
+    const h = 1 / 1440, a = moonEphemeris(d - h).r, b = moonEphemeris(d + h).r, v = moonEphemeris(d).v;
+    const err = Math.hypot(...[0, 1, 2].map((i) => v[i] - (b[i] - a[i]) / (2 * h * 86400)));
+    assert.ok(err < 0.002, `velocity off by ${err * 1000} m/s`);
+  }
 });
 
 test('Hohmann with plane change: Florida LEO → GEO matches the textbook (~4.2 km/s, ~2° at perigee)', () => {

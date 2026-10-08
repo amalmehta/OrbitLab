@@ -3,19 +3,27 @@
 // accelerates toward the Moon). Fixed-step RK4 with a step size that adapts to the
 // distance from whichever body is closest in "dynamical time".
 
-import { MU_EARTH, MU_MOON, MOON_ORBIT, R_EARTH, R_MOON, MOON_INC_DEFAULT } from './constants.js';
+import { MU_EARTH, MU_MOON, R_EARTH, R_MOON, DEFAULT_EPOCH } from './constants.js';
 import { moonState, localFrame, add, scale } from './orbits.js';
 
 export class Propagator {
-  constructor({ moonPhase0 = 0, moonInc = MOON_INC_DEFAULT, moon = true, accuracy = 0.01 } = {}) {
-    this.moonPhase0 = moonPhase0;
-    this.moonInc = moonInc;
+  // epoch: the date of t = 0, in days since J2000 (sets where the Moon is).
+  constructor({ epoch = DEFAULT_EPOCH, moon = true, accuracy = 0.01 } = {}) {
+    this.epoch = epoch;
+    this.cache = [{ t: NaN }, { t: NaN }];
     this.moon = moon;
     this.accuracy = accuracy; // fraction of the local dynamical time per step
   }
 
   moonAt(t) {
-    return moonState(t, this.moonPhase0, this.moonInc);
+    // RK4 asks for the same few times repeatedly (t + h/2 twice, t + h again next step): cache two.
+    const c = this.cache;
+    if (c[0].t === t) return c[0].m;
+    if (c[1].t === t) return c[1].m;
+    const m = moonState(t, this.epoch);
+    c[1] = c[0];
+    c[0] = { t, m };
+    return m;
   }
 
   accel(t, s, out) {
@@ -28,7 +36,7 @@ export class Propagator {
       const dx = x - m[0], dy = y - m[1], dz = z - m[2];
       const d2 = dx * dx + dy * dy + dz * dz;
       const d3 = d2 * Math.sqrt(d2);
-      const M3 = MOON_ORBIT ** 3;
+      const M3 = (m[0] * m[0] + m[1] * m[1] + m[2] * m[2]) ** 1.5;
       ax += -MU_MOON * (dx / d3 + m[0] / M3);
       ay += -MU_MOON * (dy / d3 + m[1] / M3);
       az += -MU_MOON * (dz / d3 + m[2] / M3);

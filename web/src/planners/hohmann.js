@@ -11,7 +11,7 @@ export const HOHMANN_DEFAULTS = { startAlt: 400, targetAlt: 35786, startInc: 28.
 // Direction of travel on a circular orbit of inclination inc at argument of latitude u.
 const direction = (u, inc) => unit(circularState(1, u, MU_EARTH, inc).v);
 
-export function planHohmann({ startAlt, targetAlt, startInc = 0, targetInc = 0, leadTime = 600, t0 = 0, moonInc }) {
+export function planHohmann({ startAlt, targetAlt, startInc = 0, targetInc = 0, leadTime = 600, t0 = 0, epoch }) {
   const r1 = R_EARTH + startAlt, r2 = R_EARTH + targetAlt;
   const i0 = startInc * DEG, iT = targetInc * DEG;
   const h = hohmannPlaneChange(r1, r2, iT - i0);
@@ -28,7 +28,7 @@ export function planHohmann({ startAlt, targetAlt, startInc = 0, targetInc = 0, 
   // Start leadTime before the ascending node.
   const start = circularState(r1, -n1 * leadTime, MU_EARTH, i0);
   return {
-    r1, r2, startInc, targetInc, moonInc,
+    r1, r2, startInc, targetInc, epoch,
     tof: h.tof, a: h.a,
     dv1: h.dv1, dv2: h.dv2, total: h.total,
     di1Deg: h.di1 / DEG, di2Deg: h.di2 / DEG,

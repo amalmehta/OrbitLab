@@ -1,11 +1,12 @@
 // Orbit Lab: wires the scenarios, the 3D views, the clock and the panels together.
+/* global __PLANNER_WORKER_SOURCE__ */
 
 import * as THREE from 'three';
 import { OrbitScene } from './scene/orbitScene.js';
 import { DockingScene } from './scene/dockingScene.js';
 import { Flight } from './physics/flight.js';
 import { elements, norm, moonState } from './physics/orbits.js';
-import { R_EARTH, DEG } from './physics/constants.js';
+import { R_EARTH, DEG, epochFromDate } from './physics/constants.js';
 import { planHohmann } from './planners/hohmann.js';
 import { planGravityAssist } from './planners/gravityAssist.js';
 import { planRendezvous, relativeLVLH } from './planners/rendezvous.js';
@@ -85,12 +86,41 @@ function renderLog() {
 const fmtDeg = (v) => `${Number(v).toFixed(1)}°`;
 const sliderFormat = {
   'h-start': (v) => fmtKm(v), 'h-start-inc': fmtDeg, 'h-target': (v) => fmtKm(v), 'h-target-inc': fmtDeg,
-  'a-parking': (v) => fmtKm(v), 'a-inc': fmtDeg, 'a-flyby': (v) => fmtKm(v), 'a-apogee': (v) => `${Number(v).toFixed(2)}× Moon dist.`, 'a-moon': fmtDeg,
+  'a-parking': (v) => fmtKm(v), 'a-inc': fmtDeg, 'a-flyby': (v) => fmtKm(v), 'a-apogee': (v) => `${Number(v).toFixed(2)}× Moon dist.`,
   'r-chaser': (v) => fmtKm(v), 'r-station': (v) => fmtKm(v), 'r-phase': (v) => `${v}°`,
   'r-chaser-inc': fmtDeg, 'r-station-inc': fmtDeg, 'r-node': (v) => `${Number(v) > 0 ? '+' : ''}${Number(v).toFixed(1)}°`,
 };
-// The Moon's tilt is one setting for the whole world, set in the Gravity Assist panel.
-const moonInc = () => val('a-moon') * DEG;
+// The launch date (top bar) sets where the Moon is, for every scenario.
+const dateInput = $('#epoch');
+const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+dateInput.value = loadStored('launchDate') ?? todayISO();
+const epoch = () => epochFromDate(new Date(`${dateInput.value || todayISO()}T00:00:00Z`));
+
+// The slower planners run in a worker; only the newest request's answer is used.
+let plannerWorker = null, plannerSeq = 0;
+const plannerWaiting = new Map();
+function runPlanner(kind, params) {
+  const id = ++plannerSeq;
+  return new Promise((resolve) => {
+    try {
+      if (!plannerWorker) {
+        const url = URL.createObjectURL(new Blob([__PLANNER_WORKER_SOURCE__], { type: 'text/javascript' }));
+        plannerWorker = new Worker(url);
+        plannerWorker.onmessage = (e) => { plannerWaiting.get(e.data.id)?.(e.data.plan); plannerWaiting.delete(e.data.id); };
+      }
+      plannerWaiting.set(id, resolve);
+      plannerWorker.postMessage({ id, kind, params });
+    } catch (err) {
+      console.warn('Planner worker unavailable, planning on the main thread', err);
+      setTimeout(() => resolve((kind === 'assist' ? planGravityAssist : planRendezvous)(params)), 0);
+    }
+  }).then((plan) => (id === plannerSeq ? plan : null)); // a newer request superseded this one
+}
+
+function flightFromPlan(plan, mode) {
+  if (mode === 'rendezvous') return new Flight({ craft: plan.chaser0, station: plan.station0, burns: plan.burns, epoch: plan.epoch });
+  return new Flight({ craft: plan.initialState, burns: plan.burns, epoch: plan.epoch });
+}
 const val = (id) => Number($(`#${id}`).value);
 function syncOutputs() {
   for (const [id, f] of Object.entries(sliderFormat)) $(`output[data-for="${id}"]`).textContent = f($(`#${id}`).value);
@@ -103,8 +133,8 @@ function saveInputs() {
 
 // ---------- scenario: Hohmann ----------
 function planHohmannNow() {
-  const plan = planHohmann({ startAlt: val('h-start'), targetAlt: val('h-target'), startInc: val('h-start-inc'), targetInc: val('h-target-inc'), moonInc: moonInc() });
-  setFlight(new Flight({ craft: plan.initialState, burns: plan.burns, moonInc: plan.moonInc }), plan);
+  const plan = planHohmann({ startAlt: val('h-start'), targetAlt: val('h-target'), startInc: val('h-start-inc'), targetInc: val('h-target-inc'), epoch: epoch() });
+  setFlight(flightFromPlan(plan, 'hohmann'), plan);
   orbitScene.setTargetRing(plan.r2, undefined, plan.targetInc * DEG);
   const tilt = (d) => (Math.abs(d) < 0.05 ? '' : ` + ${Math.abs(d).toFixed(1)}° tilt`);
   readout($('#h-readout'), [
@@ -130,63 +160,83 @@ function assistInputsChanged() {
   $('[data-panel=assist] [data-action=fly]').disabled = true;
   readout($('#a-readout'), [['', 'Press “Find flyby” to search for a trajectory.']]);
 }
-function planAssistNow() {
+async function planAssistNow() {
   const btn = $('[data-action=find-flyby]');
   btn.disabled = true;
   btn.textContent = 'Searching…';
-  setTimeout(() => {
-    const plan = planGravityAssist({ parkingAlt: val('a-parking'), parkingInc: val('a-inc'), flybyAlt: val('a-flyby'), side: assistSide, apogeeFactor: val('a-apogee'), moonInc: moonInc() });
-    btn.disabled = false;
-    btn.textContent = 'Find flyby';
-    if (!plan.ok) {
-      readout($('#a-readout'), [['No trajectory', plan.reason, 'warn']]);
-      $('[data-panel=assist] [data-action=fly]').disabled = true;
-      return;
-    }
-    const f = plan.flyby;
-    setFlight(new Flight({ craft: plan.initialState, burns: plan.burns, moonPhase0: plan.moonPhase0, moonInc: plan.moonInc }), plan);
-    orbitScene.setTargetRing(null);
-    orbitScene.frameEarthMoon(app.flight.prop.moonAt(f.closestTime).r);
-    $('[data-panel=assist] [data-action=fly]').disabled = false;
-    const outcome = f.escapes ? 'Escapes Earth’s gravity' : `New orbit: ${fmtKm(f.after.rp - R_EARTH)} × ${fmtKm(f.after.ra - R_EARTH)}`;
-    readout($('#a-readout'), [
-      ['Parking orbit', `${plan.parkingInc.toFixed(1)}° tilt, node at ${plan.raanDeg.toFixed(1)}°`],
-      ['Trans-lunar burn', `${fmtDv(plan.dv)} at T+ ${fmtTime(plan.burns[0].t)}`],
-      ['Time to closest approach', fmtTime(f.closestTime - plan.burns[0].t)],
-      ['Closest approach', `${fmtKm(f.periapsisAlt)} above the Moon`],
-      ['Speed relative to the Moon (v∞)', fmtDv(f.vinf)],
-      ['Turned by', `${f.turnDeg.toFixed(1)}°`],
-      ['Speed vs Earth, in → out', `${fmtDv(f.speedBefore)} → ${fmtDv(f.speedAfter)}`],
-      ['Orbit tilt, in → out', `${f.incBeforeDeg.toFixed(1)}° → ${f.incAfterDeg.toFixed(1)}°`],
-      [f.dEnergy >= 0 ? 'Energy gained' : 'Energy lost', `${Math.abs(f.dEnergy).toFixed(3)} km²/s² ≈ ${fmtDv(f.equivalentDv)} of free Δv`, 'strong'],
-      ['After the flyby', outcome],
-    ]);
-  }, 30);
+  const plan = await runPlanner('assist', {
+    parkingAlt: val('a-parking'), parkingInc: val('a-inc'), flybyAlt: val('a-flyby'), side: assistSide, apogeeFactor: val('a-apogee'), epoch: epoch(),
+  });
+  btn.disabled = false;
+  btn.textContent = 'Find flyby';
+  if (!plan || app.mode !== 'assist') return;
+  if (!plan.ok) {
+    readout($('#a-readout'), [['No trajectory', plan.reason, 'warn']]);
+    $('[data-panel=assist] [data-action=fly]').disabled = true;
+    return;
+  }
+  const f = plan.flyby;
+  setFlight(flightFromPlan(plan, 'assist'), plan);
+  orbitScene.setTargetRing(null);
+  orbitScene.frameEarthMoon(app.flight.prop.moonAt(f.closestTime).r);
+  $('[data-panel=assist] [data-action=fly]').disabled = false;
+  const outcome = f.escapes ? 'Escapes Earth’s gravity' : `New orbit: ${fmtKm(f.after.rp - R_EARTH)} × ${fmtKm(f.after.ra - R_EARTH)}`;
+  const passed = { trailing: 'behind', leading: 'in front of', north: 'over the north pole of', south: 'under the south pole of' }[plan.side];
+  readout($('#a-readout'), [
+    ['Moon on arrival', `${fmtKm(plan.moonDistance)} away, ${plan.moonDeclination.toFixed(1)}° from the equator`],
+    ['Parking orbit', `${plan.parkingInc.toFixed(1)}° tilt, node at ${plan.raanDeg.toFixed(1)}°`],
+    ['Trans-lunar burn', `${fmtDv(plan.dv)} at T+ ${fmtTime(plan.burns[0].t)}`],
+    ['Time to closest approach', fmtTime(f.closestTime - plan.burns[0].t)],
+    ['Closest approach', `${fmtKm(f.periapsisAlt)}, ${passed} the Moon`],
+    ['Speed relative to the Moon (v∞)', fmtDv(f.vinf)],
+    ['Turned by', `${f.turnDeg.toFixed(1)}°`],
+    ['Speed vs Earth, in → out', `${fmtDv(f.speedBefore)} → ${fmtDv(f.speedAfter)}`],
+    ['Orbit tilt, in → out', `${f.incBeforeDeg.toFixed(1)}° → ${f.incAfterDeg.toFixed(1)}°`, plan.side === 'north' || plan.side === 'south' ? 'strong' : ''],
+    [f.dEnergy >= 0 ? 'Energy gained' : 'Energy lost', `${Math.abs(f.dEnergy).toFixed(3)} km²/s² ≈ ${fmtDv(f.equivalentDv)} of free Δv`, plan.side === 'north' || plan.side === 'south' ? '' : 'strong'],
+    ['After the flyby', outcome],
+  ]);
 }
 
 // ---------- scenario: Rendezvous ----------
-function planRendezvousNow() {
-  const plan = planRendezvous({
-    chaserAlt: val('r-chaser'), stationAlt: val('r-station'), phaseDeg: val('r-phase'),
-    chaserInc: val('r-chaser-inc'), stationInc: val('r-station-inc'), nodeOffset: val('r-node'), moonInc: moonInc(),
-  });
+let rendezvousTimer;
+function planRendezvousSoon() { // sliders fire continuously: plan once they settle
+  clearTimeout(rendezvousTimer);
+  readout($('#r-readout'), [['', 'Planning…']]);
+  rendezvousTimer = setTimeout(planRendezvousNow, 200);
+}
+async function planRendezvousNow() {
   $('[data-action=handover]').hidden = true;
   app.handover = null;
+  const plan = await runPlanner('rendezvous', {
+    chaserAlt: val('r-chaser'), stationAlt: val('r-station'), phaseDeg: val('r-phase'),
+    chaserInc: val('r-chaser-inc'), stationInc: val('r-station-inc'), nodeOffset: val('r-node'), epoch: epoch(),
+  });
+  if (!plan || app.mode !== 'rendezvous') return;
   if (!plan.ok) {
     readout($('#r-readout'), [['Can’t plan', plan.reason, 'warn']]);
     setFlight(null, null);
     return;
   }
-  setFlight(new Flight({ craft: plan.chaser0, station: plan.station0, burns: plan.burns, moonPhase0: plan.moonPhase0, moonInc: plan.moonInc }), plan);
+  setFlight(flightFromPlan(plan, 'rendezvous'), plan);
   orbitScene.setTargetRing(plan.r2, undefined, plan.stationInc * DEG, plan.stationNode * DEG);
   const burn = (label) => fmtDv(norm(plan.burns.find((b) => b.label === label).dvInertial));
-  readout($('#r-readout'), [
-    ...(plan.planeChangeDv ? [
+  const planeRows = {
+    coplanar: [],
+    separate: [
       ['Planes differ by', `${plan.planeDiffDeg.toFixed(2)}°`],
-      ['Plane-change burn', `${fmtDv(plan.planeChangeDv)} at T+ ${fmtTime(plan.planeChangeTime)}`],
-    ] : []),
-    ['Wait for alignment', fmtTime(plan.wait)],
-    ['Station lead needed at burn', `${plan.phiReqDeg.toFixed(1)}°`],
+      ['Plane change', `separate burn, ${fmtDv(plan.planeChangeDv)} at T+ ${fmtTime(plan.planeChangeTime)}`],
+      ...(plan.combinedTotalDv ? [['Combining it would cost', fmtDv(plan.combinedTotalDv)]] : []),
+    ],
+    combined: [
+      ['Planes differ by', `${plan.planeDiffDeg.toFixed(2)}°`],
+      ['Plane change', `split: ${plan.tiltAtTransferDeg.toFixed(2)}° in the transfer burn, the rest when matching`],
+      ['Saved vs a separate burn', fmtDv(plan.separateTotalDv - plan.totalDv)],
+    ],
+  }[plan.strategy];
+  readout($('#r-readout'), [
+    ...planeRows,
+    ['Wait before the transfer', fmtTime(plan.wait)],
+    ...(plan.phiReqDeg != null ? [['Station lead needed at burn', `${plan.phiReqDeg.toFixed(1)}°`]] : []),
     ['Transfer time', fmtTime(plan.tof)],
     ['Transfer burn', burn('Transfer burn')],
     ['Matching burn', burn('Match velocity')],
@@ -256,7 +306,7 @@ function setMode(mode) {
   if (!orbital) orbitScene.hideLabels();
   if (mode === 'hohmann') planHohmannNow();
   if (mode === 'assist') { setFlight(null, null); orbitScene.setTargetRing(null); orbitScene.frameEarthMoon(); assistInputsChanged(); }
-  if (mode === 'rendezvous') planRendezvousNow();
+  if (mode === 'rendezvous') planRendezvousSoon();
   if (mode === 'docking') {
     if (app.handover) { docking.handOver(app.handover); app.handover = null; }
     onResize();
@@ -296,8 +346,7 @@ $$('input[type=range]').forEach((input) => input.addEventListener('input', () =>
   saveInputs();
   if (input.id.startsWith('h-')) planHohmannNow();
   if (input.id.startsWith('a-')) assistInputsChanged();
-  if (input.id === 'a-moon') orbitScene.setMoonInclination(moonInc());
-  if (input.id.startsWith('r-')) planRendezvousNow();
+  if (input.id.startsWith('r-')) planRendezvousSoon();
 }));
 $$('.presets button').forEach((b) => b.addEventListener('click', () => {
   const { target, target2 } = b.parentElement.dataset;
@@ -315,15 +364,20 @@ $('[data-action=find-flyby]').addEventListener('click', planAssistNow);
 $$('[data-action=fly]').forEach((b) => b.addEventListener('click', () => {
   if (!app.flight) return;
   if (app.flight.t > 0) { // fly again from the start
-    if (app.mode === 'hohmann') planHohmannNow();
-    if (app.mode === 'rendezvous') planRendezvousNow();
-    if (app.mode === 'assist') setFlight(new Flight({ craft: app.plan.initialState, burns: app.plan.burns, moonPhase0: app.plan.moonPhase0, moonInc: app.plan.moonInc }), app.plan);
+    setFlight(flightFromPlan(app.plan, app.mode), app.plan);
   }
   app.warp = Number(settings.get('defaultWarp'));
   app.paused = false;
   updateClock();
 }));
-$$('[data-action=replan]').forEach((b) => b.addEventListener('click', () => (app.mode === 'hohmann' ? planHohmannNow() : planRendezvousNow())));
+$$('[data-action=replan]').forEach((b) => b.addEventListener('click', () => (app.mode === 'hohmann' ? planHohmannNow() : planRendezvousSoon())));
+dateInput.addEventListener('change', () => {
+  saveStored('launchDate', dateInput.value);
+  orbitScene.setMoonOrbit(epoch());
+  if (app.mode === 'hohmann') planHohmannNow();
+  if (app.mode === 'assist') { setFlight(null, null); assistInputsChanged(); }
+  if (app.mode === 'rendezvous') planRendezvousSoon();
+});
 $('[data-action=handover]').addEventListener('click', () => setMode('docking'));
 $('[data-action=train]').addEventListener('click', () => {
   docking.training ? docking.stopTraining() : docking.startTraining();
@@ -419,7 +473,7 @@ function frame(now) {
       if (f.impact) { app.paused = true; renderLog(); toast(`Impact with the ${f.impact}`); }
     }
     const t = f?.t ?? 0;
-    orbitScene.update(f, f ? f.moon() : moonState(0, 1.9, moonInc()), t);
+    orbitScene.update(f, f ? f.moon() : moonState(0, epoch()), t);
     if (f) orbitScene.placeBurns(f.burns.map((b) => f.burnPositions?.[b.id]));
     orbitScene.render(width, height);
     clockAccum += dt;
@@ -429,7 +483,7 @@ function frame(now) {
 }
 
 syncOutputs();
-orbitScene.setMoonInclination(moonInc());
+orbitScene.setMoonOrbit(epoch());
 setMode(loadStored('mode') ?? 'hohmann');
 requestAnimationFrame(frame);
 

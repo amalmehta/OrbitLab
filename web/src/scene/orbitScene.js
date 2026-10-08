@@ -7,6 +7,7 @@ import { Line2 } from 'three/examples/jsm/lines/Line2.js';
 import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { R_EARTH, R_MOON, MOON_ORBIT, MOON_SOI } from '../physics/constants.js';
+import { moonEphemeris } from '../physics/orbits.js';
 import { makeEarth, makeMoon, makeStars, makeMarker } from './bodies.js';
 
 export const KM = 1 / 1000;
@@ -81,7 +82,7 @@ export class OrbitScene {
     this.scene.add(this.earth);
     this.moon = makeMoon(R_MOON * KM);
     this.scene.add(this.moon);
-    this.moonOrbit = circle(MOON_ORBIT * KM, 0x8899aa, 0.25);
+    this.moonOrbit = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0x8899aa, transparent: true, opacity: 0.3 }));
     this.scene.add(this.moonOrbit);
     this.soi = circle(MOON_SOI * KM, 0x9fa8ff, 0.35, true, 128);
     this.scene.add(this.soi);
@@ -128,10 +129,12 @@ export class OrbitScene {
     }
   }
 
-  // Tilt the Moon's orbit and sphere-of-influence rings (node on +x).
-  setMoonInclination(inc) {
-    this.moonOrbit.rotation.x = inc;
-    this.soi.rotation.x = inc;
+  // Draw the Moon's path for one month from the launch date (an ellipse, slowly turning).
+  setMoonOrbit(epoch) {
+    const pts = [];
+    for (let i = 0; i <= 360; i++) pts.push(toScene(moonEphemeris(epoch + (i / 360) * 27.55).r));
+    this.moonOrbit.geometry.dispose();
+    this.moonOrbit.geometry = new THREE.BufferGeometry().setFromPoints(pts);
   }
 
   setBurns(burns) {
@@ -193,8 +196,11 @@ export class OrbitScene {
 
   update(flight, moonState, t) {
     toScene(moonState.r, this.moon.position);
-    this.moon.rotation.y = moonState.angle; // tidally locked: same face to Earth
+    this.moon.lookAt(0, 0, 0); // tidally locked: same face to Earth
     this.soi.position.copy(this.moon.position);
+    // lay the sphere-of-influence ring in the Moon's orbital plane
+    const n = moonState.normal;
+    this.soi.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(n[0], n[2], -n[1]));
     this.earth.userData.earth.rotation.y = (t / 86164) * Math.PI * 2;
     this.earth.userData.clouds.rotation.y = (t / 86164) * Math.PI * 2 * 1.04;
     if (flight) {

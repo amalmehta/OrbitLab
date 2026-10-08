@@ -65,7 +65,8 @@ OPEN QUESTIONS / ASSUMPTIONS:
 Asked and answered (2026-10-06): Mac shell = Swift + WKWebView; RL agent trains live in the app and ships pretrained; world = Earth + Moon + station; public GitHub repo OrbitLab.
 
 Decided without asking:
-- Physics: restricted three-body in Earth's equatorial frame (Earth fixed, Moon on a circular orbit tilted 18.3°–28.6°, default 28°), RK4, impulsive burns. No lunar eccentricity or node precession, Sun, J2 or drag.
+- Physics: restricted three-body in Earth's equatorial frame (Earth fixed), RK4, impulsive burns. The Moon comes from mean orbital elements for the launch date (eccentric, 5.1° to the ecliptic, node regressing every 18.6 years, perigee every 8.85 years), without the periodic terms, so it can be a few degrees off its true position. No Sun, J2 or drag.
+- Asked and answered 2026-10-08: build the eccentric precessing Moon, over-the-pole flybys and the combined plane change. Decided: a launch-date field in the top bar replaces the Moon-tilt slider and defaults to today. Flyby sides: behind, in front, over the north pole, under the south pole. Rendezvous computes both a separate and a combined plane change and uses the cheaper.
 - Out-of-plane maneuvers (asked and answered 2026-10-06): Hohmann splits the plane change optimally between its two burns; the lunar flyby picks the parking orbit's node to contain the Moon's arrival position and solves burn time + node together; rendezvous does a separate plane-change burn where the planes cross, then plans coplanar.
 - Gravity assist: you choose which side of the Moon to pass, not "gain/lose energy". Arriving near apogee, both sides gain energy, so the panel reports the true change. A hotter TLI (about 1.3×) plus a leading-side pass loses energy.
 - Rendezvous delivers the chaser 40 m behind the docking port, at rest, which is where the docking agent takes over.
@@ -76,8 +77,7 @@ Decided without asking:
 - Dark theme only. Bundle id com.amalmehta.orbitlab. Not notarized (ad-hoc signed for local use).
 
 Proposals (not done; say the word):
-- Lunar eccentricity and node precession.
-- Combining the rendezvous plane change with the transfer burn, and over-the-pole lunar flybys.
+- The Moon's periodic terms (evection, variation) for positions accurate to a fraction of a degree.
 
 CHANGELOG:
 
@@ -102,3 +102,4 @@ CHANGELOG:
 - 2026-10-06 — website step: published to GitHub Pages via a build-and-deploy workflow
 - 2026-10-06 — trained docking agents are saved between launches (Mac app and website), with a setting to turn it off
 - 2026-10-06 — lunar inclination (equatorial frame, Moon tilt slider) and out-of-plane maneuvers in all three planners
+- 2026-10-08 — date-based eccentric, precessing Moon; over-the-pole flybys; rendezvous combines the plane change with the transfer when cheaper; flyby and rendezvous planning moved to a background worker

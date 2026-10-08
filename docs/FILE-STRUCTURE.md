@@ -33,14 +33,15 @@ Orbit Lab/
         ├── main.js               Wires scenarios, scenes, clock, panels and keyboard together
         ├── dockingController.js  Docking mode: training worker, replays, hand-over, saving your agent
         ├── physics/
-        │   ├── constants.js      Earth and Moon constants (km, s)
-        │   ├── orbits.js         Vector maths, inclined orbits, Hohmann with plane change, elements, tilted Moon
+        │   ├── constants.js      Earth and Moon constants (km, s), dates (days since J2000)
+        │   ├── orbits.js         Vector maths, inclined orbits, Hohmann with plane change, elements, Moon ephemeris
         │   ├── propagator.js     RK4 restricted three-body integrator, impulsive burns
         │   └── flight.js         A flight in progress: time, burns, trail, predicted path
         ├── planners/
         │   ├── hohmann.js        Two-burn transfer, plane change split between the burns
-        │   ├── gravityAssist.js  Solves burn time and parking node for a target lunar flyby
-        │   └── rendezvous.js     Plane change, phasing wait, Newton-targeted transfer, matching burn
+        │   ├── gravityAssist.js  Solves burn time, node and TLI Δv for a flyby on any side of the Moon
+        │   ├── rendezvous.js     Separate or combined plane change, phasing, targeted transfer, matching burn
+        │   └── planner.worker.js Runs the flyby and rendezvous planners off the main thread
         ├── rl/
         │   ├── mlp.js            Small neural network with backprop and Adam
         │   ├── dockingEnv.js     Clohessy–Wiltshire docking environment and reward

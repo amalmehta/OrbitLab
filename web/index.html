@@ -15,6 +15,7 @@
       <button role="tab" data-mode="rendezvous" title="Rendezvous (3)">Rendezvous</button>
       <button role="tab" data-mode="docking" title="Docking Agent (4)">Docking Agent</button>
     </nav>
+    <label class="launch-date" title="Launch date: sets where the Moon is, for every scenario">Launch <input type="date" id="epoch" min="1990-01-01" max="2100-12-31"></label>
     <div class="clock" id="clock-controls">
       <button class="icon" data-action="pause" title="Play / pause (Space)" aria-label="Play or pause">▶</button>
       <button class="icon" data-action="slower" title="Slower (,)" aria-label="Slower">«</button>
@@ -49,7 +50,7 @@
 
     <section data-panel="assist" hidden>
       <h2>Gravity Assist</h2>
-      <p class="lede">Swing past the Moon to change your orbit around Earth without burning fuel. The planner picks your parking orbit's node so the Moon is in its plane when you arrive, then searches for when to fire so you pass at the altitude and side you choose.</p>
+      <p class="lede">Swing past the Moon to change your orbit around Earth without burning fuel. The Moon is where it really is on the launch date. The planner picks your parking orbit's node so the Moon is in its plane when you arrive, then solves for when to fire so you pass at the altitude and side you choose. Passing over a pole tilts your orbit.</p>
       <div class="field"><label for="a-parking">Parking orbit altitude</label><output data-for="a-parking"></output>
         <input type="range" id="a-parking" min="160" max="1000" step="10" value="200"></div>
       <div class="field"><label for="a-inc">Parking orbit inclination</label><output data-for="a-inc"></output>
@@ -58,12 +59,12 @@
         <input type="range" id="a-flyby" min="100" max="15000" step="50" value="2000"></div>
       <div class="field"><label for="a-apogee">Trans-lunar burn energy</label><output data-for="a-apogee"></output>
         <input type="range" id="a-apogee" min="1" max="1.5" step="0.01" value="1"></div>
-      <div class="field"><label for="a-moon">Moon's orbit tilt to the equator</label><output data-for="a-moon"></output>
-        <input type="range" id="a-moon" min="18.3" max="28.6" step="0.1" value="28"></div>
       <div class="field"><span class="field-label">Pass the Moon</span>
         <div class="segmented" id="a-side" role="radiogroup">
           <button data-value="trailing" aria-pressed="true">Behind it</button>
           <button data-value="leading" aria-pressed="false">In front of it</button>
+          <button data-value="north" aria-pressed="false">Over its north pole</button>
+          <button data-value="south" aria-pressed="false">Under its south pole</button>
         </div></div>
       <div class="actions"><button class="primary" data-action="find-flyby">Find flyby</button><button data-action="fly" disabled>Fly it</button></div>
       <dl class="readout" id="a-readout"></dl>
